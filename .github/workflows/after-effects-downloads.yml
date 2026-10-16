@@ -32,6 +32,8 @@ jobs:
           components: rustfmt
           targets: x86_64-pc-windows-msvc
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - name: Check formatting
         run: cargo fmt --check
       - name: Build editor and CLI with static CRT

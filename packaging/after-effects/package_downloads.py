@@ -15,7 +15,7 @@ NOTICE_SHA256 = "cd5324bb1b41f5eac11ea84573ed6ca63b23b0909dd4d5ca62a3e3aca17213a
 
 
 def command(root, *args):
-    return subprocess.check_output(args, cwd=root, text=True).strip()
+    return subprocess.check_output(args, cwd=root, text=True, encoding="utf-8").strip()
 
 
 def digest(path):
