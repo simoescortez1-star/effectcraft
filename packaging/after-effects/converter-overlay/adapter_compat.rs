@@ -7,13 +7,14 @@ pub(crate) fn preset(bytes: &[u8]) -> Result<Import> {
     if bytes.len() > 1024 * 1024 {
         return Err("FFX exceeds the experimental 1 MiB limit".into());
     }
-    // The source does not expose a verified rate field. Retain raw ticks and bytes
-    // so this explicitly reported assumption can be corrected without data loss.
-    const CLOCK: u32 = 8000;
-    let (nodes, diagnostics) = ae::effectcraft_preset(bytes, CLOCK).map_err(|e| e.to_string())?;
+    let (nodes, diagnostics, clock, saved_clock) = ae::effectcraft_preset(bytes, 8000).map_err(|e| e.to_string())?;
     let mut project = Project::default();
     let mut report = Report::default();
-    report.warn("preset", "Experimental FFX clock: 8000 ticks/second assumed, not verified against AE. Raw ticks, parameters and source bytes are preserved. Expressions remain disabled. Unsupported effects are preserved as data, never approximated.");
+    if saved_clock {
+        report.warn("preset", format!("FFX saved timebase: {clock} ticks/second from container/property metadata. Saved key offsets are retained relative to the playhead. AE reference timing and visual equivalence remain unverified. Expressions remain disabled."));
+    } else {
+        report.warn("preset", "Experimental FFX clock: 8000 ticks/second assumed because no saved timebase was found. Raw ticks, parameters and source bytes are preserved; AE timing is unverified. Expressions remain disabled.");
+    }
     for diagnostic in diagnostics {
         report.warn(&format!("byte {}", diagnostic.offset), format!("{}: {}", diagnostic.code, diagnostic.message));
     }
@@ -37,14 +38,14 @@ pub(crate) fn preset(bytes: &[u8]) -> Result<Import> {
         if let Some(node) = matches.first() {
             let property = node.property.as_ref().ok_or("missing preset property")?;
             let target = layer.props.prop_mut(path).ok_or("missing carrier transform")?;
-            map_property(property, target, name, CLOCK, "preset", &mut report)?;
+            map_property(property, target, name, clock, "preset", &mut report)?;
             mapped.insert(node.source.offset);
             paths.push(*path);
         }
     }
     // Existing Gaussian mapper is shared with AEP conversion. All other effect
     // identities remain unavailable, together with their complete saved tree.
-    let effects = effects::convert(&ae::Project::default(), &nodes, &mut build::Ids(&mut project.next_id), CLOCK, "preset", &mut mapped, &mut report)?;
+    let effects = effects::convert(&ae::Project::default(), &nodes, &mut build::Ids(&mut project.next_id), clock, "preset", &mut mapped, &mut report)?;
     let available = effects.iter().map(|g| g.match_id.clone()).collect::<Vec<_>>();
     if let Some(group) = layer.props.sub_mut("effects") {
         group.children.extend(effects.into_iter().map(Node::Group));
@@ -58,7 +59,7 @@ pub(crate) fn preset(bytes: &[u8]) -> Result<Import> {
     for byte in bytes {
         write!(&mut hex, "{byte:02x}").map_err(|e| e.to_string())?;
     }
-    layer.comment = serde_json::to_string(&serde_json::json!({"effectcraftPreset":1,"assumedTicksPerSecond":CLOCK,"timingVerified":false,"sourceHex":hex,"nodes":nodes,"mappedPaths":paths,"availableEffects":available,"unavailableEffects":unavailable})).map_err(|e|e.to_string())?;
+    layer.comment = serde_json::to_string(&serde_json::json!({"effectcraftPreset":1,"sourceTicksPerSecond":clock,"assumedTicksPerSecond":(!saved_clock).then_some(clock),"timingSource":if saved_clock {"saved-container/property-metadata"} else {"legacy-assumption"},"timingVerified":false,"sourceHex":hex,"nodes":nodes,"mappedPaths":paths,"availableEffects":available,"unavailableEffects":unavailable})).map_err(|e|e.to_string())?;
     if layer.comment.len() > 6 * 1024 * 1024 {
         return Err("decoded preset metadata exceeds 6 MiB".into());
     }

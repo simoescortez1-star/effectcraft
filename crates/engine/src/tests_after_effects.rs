@@ -243,6 +243,119 @@ fn ffx_external_generated_end_to_end() {
 
 #[test]
 #[cfg(not(target_arch = "wasm32"))]
+#[ignore = "requires external converter and original generated direct-tdbs Scale/transform fixtures"]
+fn ffx_direct_transform_presets_render_and_preserve_saved_timebase() {
+    let path = std::path::PathBuf::from(std::env::var_os("EFFECTCRAFT_TEST_FFX").unwrap()).with_file_name("scale.ffx");
+    let (mut s, layer) = check_scale_preset(&path, 48000, [24000, 48000], [[50., 75., 100.], [150., 125., 100.]], [65.625, 82.8125, 100.]);
+    let result = s.execute("anim.applyAfterEffectsPreset", json!({"path":path.with_file_name("transforms.ffx"),"layers":[layer]})).unwrap();
+    assert_eq!(result["propertiesApplied"], 4);
+    assert_eq!(result["keyframesApplied"], 8);
+    for (path, value) in [
+        ("transform/position", json!([16., 16., 0.])),
+        ("transform/anchor", json!([16., 16., 0.])),
+        ("transform/rotation", json!(20.)),
+        ("transform/opacity", json!(60.)),
+    ] {
+        let prop = s.active_comp().unwrap().layers[0].props.prop(path).unwrap();
+        assert_eq!(prop.keys.len(), 2);
+        assert_eq!(serde_json::to_value(prop.keys[0].value.clone()).unwrap()["v"], value);
+    }
+    let before = s.project.to_json();
+    let result = s.execute("anim.applyAfterEffectsPreset", json!({"path":path.with_file_name("conflicting-clock.ffx"),"layers":[layer]}));
+    assert!(result.is_err(), "conflicting timebases must not silently change key timing");
+    assert_eq!(s.project.to_json(), before);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn check_scale_preset(path: &std::path::Path, clock: i64, ticks: [i64; 2], values: [[f64; 3]; 2], quarter: [f64; 3]) -> (Session, u64) {
+    use effectcraft_time::{TICKS_PER_SECOND, Tick};
+    let executable = std::env::var_os("EFFECTCRAFT_AEP_CONVERTER").unwrap();
+    let original = std::fs::read(path).unwrap();
+    let make_target = || {
+        let mut s = Session::default();
+        Arc::make_mut(&mut s.project).settings.bit_depth = effectcraft_project::BitDepth::Bpc32;
+        s.execute("comp.new", json!({"name":"FFX Scale","width":32,"height":32,"duration":5,"frameRate":60})).unwrap();
+        let layer = s.execute("layer.newSolid", json!({"width":8,"height":8,"color":"#ffffff"})).unwrap()["layer"].as_u64().unwrap();
+        (s, layer)
+    };
+    let (mut s, layer) = make_target();
+    s.ae_converter =
+        Some(Arc::new(effectcraft_ae_bridge::process::ExternalConverter { executable: executable.into(), timeout: std::time::Duration::from_secs(30) }));
+    s.execute("time.set", json!({"time":0.5})).unwrap();
+    let before = s.project.to_json();
+    let result = s.execute("anim.applyAfterEffectsPreset", json!({"path":path,"layers":[layer]})).unwrap();
+    assert_eq!(result["applied"], true);
+    assert_eq!(result["propertiesApplied"], 1);
+    assert_eq!(result["keyframesApplied"], 2);
+    assert_eq!(result["sourceTicksPerSecond"], clock);
+    assert_eq!(result["unavailableEffects"], json!([]));
+    let prop = s.active_comp().unwrap().layers[0].props.prop("transform/scale").unwrap();
+    let uid = prop.uid;
+    assert_eq!(prop.keys.len(), 2);
+    let times = ticks.map(|time| Tick(TICKS_PER_SECOND / 2 + TICKS_PER_SECOND * time / clock));
+    for index in 0..2 {
+        assert_eq!(prop.keys[index].time, times[index]);
+        for (actual, expected) in prop.keys[index].value.as_vec3().iter().zip(values[index]) {
+            assert!((actual - expected).abs() < 1e-8);
+        }
+        assert_eq!(prop.keys[index].in_interp, effectcraft_keyframe::Interp::Bezier);
+        assert_eq!(prop.keys[index].out_interp, effectcraft_keyframe::Interp::Bezier);
+    }
+    let quarter_time = Tick(times[0].0 + (times[1].0 - times[0].0) / 4);
+    for (actual, expected) in prop.value_at(quarter_time).as_vec3().iter().zip(quarter) {
+        assert!((actual - expected).abs() < 1e-6, "Bezier value: {actual} != {expected}");
+    }
+    assert!(s.events.iter().any(|event| matches!(event, crate::Event::Frontend{command,params} if command=="timeline.revealProps" && params["props"].as_array().unwrap().iter().any(|p| p["prop"]==uid))));
+    let cid = s.active_comp_id().unwrap();
+    let (mut reference, reference_layer) = make_target();
+    let reference_cid = reference.active_comp_id().unwrap();
+    let mut frames = Vec::new();
+    for (time, scale) in [(times[0], values[0]), (quarter_time, quarter), (times[1], values[1])] {
+        reference.execute("prop.set", json!({"layer":reference_layer,"path":"transform/scale","value":scale})).unwrap();
+        let expected = reference.render(reference_cid, time, Default::default());
+        let rendered = s.render(cid, time, Default::default());
+        for (actual, expected) in rendered.data.iter().flatten().zip(expected.data.iter().flatten()) {
+            assert!((actual - expected).abs() < 0.0001, "rendered pixel differs from explicit expected scale");
+        }
+        frames.push(rendered.data);
+    }
+    assert_ne!(frames[0], frames[1], "advancing frames must visibly animate Scale");
+    assert_ne!(frames[0], frames[2]);
+    let saved = s.project.to_file_json().unwrap();
+    let reopened = Session { project: Arc::new(Project::from_json(&saved).unwrap()), ..Default::default() };
+    assert_eq!(reopened.render(cid, times[1], Default::default()).data, frames[2]);
+    s.execute("edit.undo", json!({})).unwrap();
+    assert_eq!(s.project.to_json(), before);
+    s.execute("edit.redo", json!({})).unwrap();
+    assert_eq!(s.project.to_file_json().unwrap(), saved);
+    assert_eq!(std::fs::read(path).unwrap(), original);
+    (s, layer)
+}
+
+#[test]
+#[cfg(not(target_arch = "wasm32"))]
+#[ignore = "private uploaded scale.ffx is never redistributed; set EFFECTCRAFT_TEST_USER_SCALE explicitly"]
+fn user_scale_ffx_creates_saved_keys_and_renders_animated_pixels() {
+    let path = std::path::PathBuf::from(std::env::var_os("EFFECTCRAFT_TEST_USER_SCALE").unwrap());
+    // Independently solve the saved temporal Bezier at one-quarter of the segment.
+    let (mut low, mut high) = (0.0_f64, 1.0_f64);
+    for _ in 0..80 {
+        let u = (low + high) / 2.0;
+        let x = 3.0 * (1.0 - u).powi(2) * u * 0.91 + 3.0 * (1.0 - u) * u * u * 0.999 + u * u * u;
+        if x < 0.25 {
+            low = u;
+        } else {
+            high = u;
+        }
+    }
+    let u = (low + high) / 2.0;
+    let last_handle = 380.0 - 10416.0 * 100.0 * 0.25 * 0.001;
+    let x = (1.0 - u).powi(3) * 100.0 + 3.0 * (1.0 - u).powi(2) * u * 100.0 + 3.0 * (1.0 - u) * u * u * last_handle + u * u * u * 380.0;
+    check_scale_preset(&path, 30720, [19456, 27136], [[100., 100., 100.], [380., 100., 100.]], [x, 100., 100.]);
+}
+
+#[test]
+#[cfg(not(target_arch = "wasm32"))]
 #[ignore = "private user fixtures are never redistributed; set EFFECTCRAFT_TEST_USER_AEP and EFFECTCRAFT_TEST_USER_FFX explicitly"]
 fn user_after_effects_inputs_preserve_measured_structure_and_unavailable_effect() {
     let aep = std::env::var("EFFECTCRAFT_TEST_USER_AEP").unwrap();
@@ -315,10 +428,15 @@ fn aex_native_worker_renders_and_recovers_after_child_exit() {
     let (mut s, layer) = preset_target();
     s.execute("effect.aex.addFolder", json!({"folder":path.parent().unwrap()})).unwrap();
     s.execute("effect.aex.scan", json!({})).unwrap();
-    let loaded = s.execute("effect.aex.load", json!({"path":path})).unwrap();
+    assert_eq!(s.execute("effect.aex.list", json!({})).unwrap()["runtime"]["workerFound"], true);
+    let loaded = s.execute("effect.aex.loadAndApply", json!({"path":path,"layers":[layer]})).unwrap();
     assert_eq!(loaded["rendered"], true);
     assert_eq!(loaded["fidelityVerified"], false);
-    s.execute("effect.apply", json!({"effect":loaded["effect"],"layers":[layer]})).unwrap();
+    let reloaded = s.execute("effect.aex.load", json!({"path":path})).unwrap();
+    assert_eq!(reloaded["effect"], loaded["effect"]);
+    assert_eq!(reloaded["rendered"], true);
+    assert_eq!(reloaded["parameters"], 1);
+    assert_eq!(s.active_comp().unwrap().layers[0].props.sub("effects").unwrap().groups().count(), 1);
     s.execute("prop.set", json!({"layer":layer,"path":"effects/#1/p1","value":0.5})).unwrap();
     let cid = s.active_comp_id().unwrap();
     let frame = s.render(cid, effectcraft_time::Tick::ZERO, Default::default());

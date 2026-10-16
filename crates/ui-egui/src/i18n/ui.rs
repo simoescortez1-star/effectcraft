@@ -87,6 +87,27 @@ pub(crate) fn tr_args(text: &str, args: &[&dyn Display]) -> String {
 
 /// Japanese: the same rows, in the same order, as the Chinese catalogs below (the tests keep the two in step).
 const JAPANESE: &[(&str, &str)] = &[
+    ("Plugin Manager", "プラグインマネージャー"),
+    ("After Effects native plugins — experimental CPU runtime", "After Effects ネイティブプラグイン — 実験的 CPU ランタイム"),
+    (
+        "Scanning does not execute plugins. Loading runs a separate worker: CPU Smart Render, float sliders, 32-bit frames. Commercial compatibility and visual fidelity are unverified.",
+        "検索ではプラグインを実行しません。読み込みは別プロセスで行い、CPU Smart Render、float スライダー、32 ビットフレームに対応します。商用互換性と視覚的忠実度は未検証です。",
+    ),
+    ("Add folder", "フォルダーを追加"),
+    ("Rescan folders", "フォルダーを再検索"),
+    ("Find installed plugins", "インストール済みプラグインを検索"),
+    ("No candidates found. Add a folder and scan to inspect plugins.", "候補がありません。フォルダーを追加してプラグインを検索してください。"),
+    ("Plugin: {}", "プラグイン: {}"),
+    (
+        "Loaded: {} · Initialized: {} · Parameters: {} · Rendered: {} · Visual fidelity: unverified",
+        "読み込み: {} · 初期化: {} · パラメーター: {} · レンダリング: {} · 視覚的忠実度: 未検証",
+    ),
+    ("Scan bundled test plugin", "同梱テストプラグインを検索"),
+    ("Load, test and apply", "読み込み・テスト・適用"),
+    ("Load and test", "読み込みとテスト"),
+    ("Native worker found; loading is explicit.", "ネイティブワーカーが見つかりました。読み込みは明示的に実行します。"),
+    ("Native worker missing. Extract the entire Windows ZIP.", "ネイティブワーカーがありません。Windows ZIP 全体を展開してください。"),
+    ("Native AEX requires Windows x64.", "ネイティブ AEX には Windows x64 が必要です。"),
     ("Technical details", "技術的な詳細"),
     ("Appearance Settings…", "外観設定…"),
     ("Add to favorites", "お気に入りに追加"),
@@ -638,6 +659,27 @@ const JAPANESE: &[(&str, &str)] = &[
 ];
 
 const SIMPLIFIED_CHINESE: &[(&str, &str)] = &[
+    ("Plugin Manager", "插件管理器"),
+    ("After Effects native plugins — experimental CPU runtime", "After Effects 原生插件 — 实验性 CPU 运行时"),
+    (
+        "Scanning does not execute plugins. Loading runs a separate worker: CPU Smart Render, float sliders, 32-bit frames. Commercial compatibility and visual fidelity are unverified.",
+        "扫描不会执行插件。加载会运行独立工作进程：CPU Smart Render、浮点滑块、32 位帧。商业插件兼容性和视觉保真度尚未验证。",
+    ),
+    ("Add folder", "添加文件夹"),
+    ("Rescan folders", "重新扫描文件夹"),
+    ("Find installed plugins", "查找已安装插件"),
+    ("No candidates found. Add a folder and scan to inspect plugins.", "未找到候选插件。请添加文件夹并扫描。"),
+    ("Plugin: {}", "插件：{}"),
+    (
+        "Loaded: {} · Initialized: {} · Parameters: {} · Rendered: {} · Visual fidelity: unverified",
+        "已加载：{} · 已初始化：{} · 参数：{} · 已渲染：{} · 视觉保真度：未验证",
+    ),
+    ("Scan bundled test plugin", "扫描附带的测试插件"),
+    ("Load, test and apply", "加载、测试并应用"),
+    ("Load and test", "加载并测试"),
+    ("Native worker found; loading is explicit.", "已找到原生工作进程；加载需要明确操作。"),
+    ("Native worker missing. Extract the entire Windows ZIP.", "缺少原生工作进程。请完整解压 Windows ZIP。"),
+    ("Native AEX requires Windows x64.", "原生 AEX 需要 Windows x64。"),
     ("Technical details", "技术详情"),
     ("Appearance Settings…", "外观设置…"),
     ("Add to favorites", "添加到收藏"),
@@ -1371,6 +1413,27 @@ const SIMPLIFIED_CHINESE: &[(&str, &str)] = &[
 ];
 
 const TRADITIONAL_CHINESE: &[(&str, &str)] = &[
+    ("Plugin Manager", "外掛管理員"),
+    ("After Effects native plugins — experimental CPU runtime", "After Effects 原生外掛 — 實驗性 CPU 執行環境"),
+    (
+        "Scanning does not execute plugins. Loading runs a separate worker: CPU Smart Render, float sliders, 32-bit frames. Commercial compatibility and visual fidelity are unverified.",
+        "掃描不會執行外掛。載入會執行獨立工作程序：CPU Smart Render、浮點滑桿、32 位元影格。商用外掛相容性和視覺保真度尚未驗證。",
+    ),
+    ("Add folder", "新增資料夾"),
+    ("Rescan folders", "重新掃描資料夾"),
+    ("Find installed plugins", "尋找已安裝外掛"),
+    ("No candidates found. Add a folder and scan to inspect plugins.", "找不到候選外掛。請新增資料夾並掃描。"),
+    ("Plugin: {}", "外掛：{}"),
+    (
+        "Loaded: {} · Initialized: {} · Parameters: {} · Rendered: {} · Visual fidelity: unverified",
+        "已載入：{} · 已初始化：{} · 參數：{} · 已算繪：{} · 視覺保真度：未驗證",
+    ),
+    ("Scan bundled test plugin", "掃描隨附的測試外掛"),
+    ("Load, test and apply", "載入、測試並套用"),
+    ("Load and test", "載入並測試"),
+    ("Native worker found; loading is explicit.", "已找到原生工作程序；載入需要明確操作。"),
+    ("Native worker missing. Extract the entire Windows ZIP.", "缺少原生工作程序。請完整解壓縮 Windows ZIP。"),
+    ("Native AEX requires Windows x64.", "原生 AEX 需要 Windows x64。"),
     ("Technical details", "技術詳細資料"),
     ("Appearance Settings…", "外觀設定…"),
     ("Add to favorites", "加入最愛"),
@@ -2101,6 +2164,27 @@ const TRADITIONAL_CHINESE: &[(&str, &str)] = &[
 /// Ukrainian (uk): original translations of the same interface rows as the Chinese catalogs.
 /// Technical names, key names and substituted project content keep their original spelling.
 const UKRAINIAN: &[(&str, &str)] = &[
+    ("Plugin Manager", "Менеджер плагінів"),
+    ("After Effects native plugins — experimental CPU runtime", "Нативні плагіни After Effects — експериментальний CPU-рушій"),
+    (
+        "Scanning does not execute plugins. Loading runs a separate worker: CPU Smart Render, float sliders, 32-bit frames. Commercial compatibility and visual fidelity are unverified.",
+        "Сканування не виконує плагіни. Завантаження запускає окремий процес: CPU Smart Render, повзунки float, 32-бітні кадри. Сумісність комерційних плагінів і візуальна точність не перевірені.",
+    ),
+    ("Add folder", "Додати теку"),
+    ("Rescan folders", "Пересканувати теки"),
+    ("Find installed plugins", "Знайти встановлені плагіни"),
+    ("No candidates found. Add a folder and scan to inspect plugins.", "Кандидатів не знайдено. Додайте теку та проскануйте плагіни."),
+    ("Plugin: {}", "Плагін: {}"),
+    (
+        "Loaded: {} · Initialized: {} · Parameters: {} · Rendered: {} · Visual fidelity: unverified",
+        "Завантажено: {} · Ініціалізовано: {} · Параметри: {} · Рендеринг: {} · Візуальна точність: не перевірена",
+    ),
+    ("Scan bundled test plugin", "Знайти комплектний тестовий плагін"),
+    ("Load, test and apply", "Завантажити, перевірити й застосувати"),
+    ("Load and test", "Завантажити й перевірити"),
+    ("Native worker found; loading is explicit.", "Нативний допоміжний процес знайдено; завантаження виконується явно."),
+    ("Native worker missing. Extract the entire Windows ZIP.", "Нативний допоміжний процес відсутній. Розпакуйте весь ZIP для Windows."),
+    ("Native AEX requires Windows x64.", "Нативний AEX потребує Windows x64."),
     ("Technical details", "Технічні подробиці"),
     ("Appearance Settings…", "Налаштування вигляду…"),
     ("Add to favorites", "Додати до вибраного"),
@@ -2668,6 +2752,27 @@ const UKRAINIAN: &[(&str, &str)] = &[
 
 // Brazilian Portuguese.
 const PORTUGUESE: &[(&str, &str)] = &[
+    ("Plugin Manager", "Gerenciador de plugins"),
+    ("After Effects native plugins — experimental CPU runtime", "Plugins nativos do After Effects — runtime CPU experimental"),
+    (
+        "Scanning does not execute plugins. Loading runs a separate worker: CPU Smart Render, float sliders, 32-bit frames. Commercial compatibility and visual fidelity are unverified.",
+        "A varredura não executa plugins. O carregamento usa um processo separado: CPU Smart Render, sliders float e frames de 32 bits. Compatibilidade comercial e fidelidade visual não verificadas.",
+    ),
+    ("Add folder", "Adicionar pasta"),
+    ("Rescan folders", "Examinar pastas novamente"),
+    ("Find installed plugins", "Localizar plugins instalados"),
+    ("No candidates found. Add a folder and scan to inspect plugins.", "Nenhum candidato encontrado. Adicione uma pasta e examine os plugins."),
+    ("Plugin: {}", "Plugin: {}"),
+    (
+        "Loaded: {} · Initialized: {} · Parameters: {} · Rendered: {} · Visual fidelity: unverified",
+        "Carregado: {} · Inicializado: {} · Parâmetros: {} · Renderizado: {} · Fidelidade visual: não verificada",
+    ),
+    ("Scan bundled test plugin", "Localizar plugin de teste incluído"),
+    ("Load, test and apply", "Carregar, testar e aplicar"),
+    ("Load and test", "Carregar e testar"),
+    ("Native worker found; loading is explicit.", "Processo auxiliar nativo encontrado; o carregamento exige ação explícita."),
+    ("Native worker missing. Extract the entire Windows ZIP.", "Processo auxiliar nativo ausente. Extraia o ZIP Windows inteiro."),
+    ("Native AEX requires Windows x64.", "AEX nativo exige Windows x64."),
     ("Technical details", "Detalhes técnicos"),
     ("   OK   ", "   OK   "),
     ("  Delete  ", "  Excluir  "),
@@ -3112,6 +3217,27 @@ const PORTUGUESE: &[(&str, &str)] = &[
 
 /// Czech (cs): original translations covering every row in the Chinese panel catalogs.
 const CZECH: &[(&str, &str)] = &[
+    ("Plugin Manager", "Správce doplňků"),
+    ("After Effects native plugins — experimental CPU runtime", "Nativní doplňky After Effects — experimentální CPU běhové prostředí"),
+    (
+        "Scanning does not execute plugins. Loading runs a separate worker: CPU Smart Render, float sliders, 32-bit frames. Commercial compatibility and visual fidelity are unverified.",
+        "Vyhledávání doplňky nespouští. Načítání používá samostatný proces: CPU Smart Render, desetinné posuvníky a 32bitové snímky. Komerční kompatibilita a vizuální věrnost nejsou ověřeny.",
+    ),
+    ("Add folder", "Přidat složku"),
+    ("Rescan folders", "Znovu prohledat složky"),
+    ("Find installed plugins", "Najít nainstalované doplňky"),
+    ("No candidates found. Add a folder and scan to inspect plugins.", "Nebyli nalezeni žádní kandidáti. Přidejte složku a vyhledejte doplňky."),
+    ("Plugin: {}", "Doplněk: {}"),
+    (
+        "Loaded: {} · Initialized: {} · Parameters: {} · Rendered: {} · Visual fidelity: unverified",
+        "Načteno: {} · Inicializováno: {} · Parametry: {} · Vykresleno: {} · Vizuální věrnost: neověřena",
+    ),
+    ("Scan bundled test plugin", "Vyhledat přibalený testovací doplněk"),
+    ("Load, test and apply", "Načíst, otestovat a použít"),
+    ("Load and test", "Načíst a otestovat"),
+    ("Native worker found; loading is explicit.", "Nativní pomocný proces byl nalezen; načítání vyžaduje výslovnou akci."),
+    ("Native worker missing. Extract the entire Windows ZIP.", "Nativní pomocný proces chybí. Rozbalte celý ZIP pro Windows."),
+    ("Native AEX requires Windows x64.", "Nativní AEX vyžaduje Windows x64."),
     ("Technical details", "Technické podrobnosti"),
     ("   OK   ", "   OK   "),
     ("  Delete  ", "  Odstranit  "),
@@ -3659,6 +3785,27 @@ const CZECH: &[(&str, &str)] = &[
 /// order. Terms follow the Spanish menu catalog (composición, material de archivo, cola de procesamiento,
 /// ajuste preestablecido, método abreviado). Written from the English source.
 const SPANISH: &[(&str, &str)] = &[
+    ("Plugin Manager", "Administrador de plugins"),
+    ("After Effects native plugins — experimental CPU runtime", "Plugins nativos de After Effects — runtime CPU experimental"),
+    (
+        "Scanning does not execute plugins. Loading runs a separate worker: CPU Smart Render, float sliders, 32-bit frames. Commercial compatibility and visual fidelity are unverified.",
+        "La búsqueda no ejecuta plugins. La carga usa un proceso separado: CPU Smart Render, controles float y fotogramas de 32 bits. La compatibilidad comercial y la fidelidad visual no están verificadas.",
+    ),
+    ("Add folder", "Añadir carpeta"),
+    ("Rescan folders", "Volver a buscar en carpetas"),
+    ("Find installed plugins", "Buscar plugins instalados"),
+    ("No candidates found. Add a folder and scan to inspect plugins.", "No se encontraron candidatos. Añade una carpeta y busca los plugins."),
+    ("Plugin: {}", "Plugin: {}"),
+    (
+        "Loaded: {} · Initialized: {} · Parameters: {} · Rendered: {} · Visual fidelity: unverified",
+        "Cargado: {} · Inicializado: {} · Parámetros: {} · Renderizado: {} · Fidelidad visual: sin verificar",
+    ),
+    ("Scan bundled test plugin", "Buscar el plugin de prueba incluido"),
+    ("Load, test and apply", "Cargar, probar y aplicar"),
+    ("Load and test", "Cargar y probar"),
+    ("Native worker found; loading is explicit.", "Proceso auxiliar nativo encontrado; la carga requiere una acción explícita."),
+    ("Native worker missing. Extract the entire Windows ZIP.", "Falta el proceso auxiliar nativo. Extrae el ZIP completo de Windows."),
+    ("Native AEX requires Windows x64.", "AEX nativo requiere Windows x64."),
     ("Technical details", "Detalles técnicos"),
     ("Appearance Settings…", "Ajustes de apariencia…"),
     ("Add to favorites", "Añadir a favoritos"),
@@ -4220,6 +4367,7 @@ mod tests {
         ("menus.rs", include_str!("../menus.rs")),
         ("widgets.rs", include_str!("../widgets.rs")),
         ("panels/anim_tools.rs", include_str!("../panels/anim_tools.rs")),
+        ("panels/ae_plugins.rs", include_str!("../panels/ae_plugins.rs")),
         ("panels/camera_tracker_ui.rs", include_str!("../panels/camera_tracker_ui.rs")),
         ("panels/comp_settings.rs", include_str!("../panels/comp_settings.rs")),
         ("panels/content_fill_panel.rs", include_str!("../panels/content_fill_panel.rs")),

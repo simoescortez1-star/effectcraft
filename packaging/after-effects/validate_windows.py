@@ -28,10 +28,11 @@ def main():
                EFFECTCRAFT_AEX_WORKER=str(native / "effectcraft-aex-worker.exe"),
                EFFECTCRAFT_TEST_FFX=str(out / "opacity.ffx"), EFFECTCRAFT_TEST_AEX=str(plugin))
     results = {}
-    for test in ["ffx_external_generated_end_to_end", "aex_native_worker_renders_and_recovers_after_child_exit"]:
+    for test in ["ffx_external_generated_end_to_end", "ffx_direct_transform_presets_render_and_preserve_saved_timebase",
+                 "aex_native_worker_renders_and_recovers_after_child_exit"]:
         result = subprocess.run(["cargo", "+1.95.0", "test", "--locked", "--release", "--target", "x86_64-pc-windows-msvc",
                                  "-p", "effectcraft-engine", "--lib", f"tests_after_effects::{test}", "--", "--ignored", "--exact", "--nocapture"],
-                                cwd=root, env=env, text=True, capture_output=True, errors="replace", timeout=900)
+                                cwd=root, env=env, text=True, encoding="utf-8", capture_output=True, errors="replace", timeout=900)
         log = result.stdout + result.stderr
         (out / f"{test}.txt").write_text(log, encoding="utf-8")
         print(log, flush=True)

@@ -31,6 +31,13 @@ pub struct Candidate {
     pub fidelity_verified: bool,
 }
 
+impl Candidate {
+    /// A header may permit an explicit load attempt, never automatic execution.
+    pub fn can_load(&self) -> bool {
+        self.enabled && self.compatibility != Compatibility::Unsupported
+    }
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Scan {
     pub plugins: Vec<Candidate>,

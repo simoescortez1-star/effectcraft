@@ -92,7 +92,26 @@ fn toggle(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 fn native_available(_: &Session) -> std::result::Result<(), String> {
-    if cfg!(target_os = "windows") { Ok(()) } else { Err("native AEX execution requires Windows x64".into()) }
+    if cfg!(all(target_os = "windows", target_arch = "x86_64")) { Ok(()) } else { Err("native AEX execution requires Windows x64".into()) }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn worker_executable() -> Option<std::path::PathBuf> {
+    std::env::var_os("EFFECTCRAFT_AEX_WORKER")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::current_exe().ok().map(|p| p.with_file_name("effectcraft-aex-worker.exe")))
+}
+
+fn runtime_info() -> Value {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let worker = worker_executable();
+        let found = worker.as_ref().is_some_and(|p| p.is_absolute() && p.is_file());
+        let folder = std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.join("test-plugins"))).filter(|p| p.join("EffectCraft Gain.aex").is_file());
+        json!({"platformSupported":cfg!(all(target_os="windows",target_arch="x86_64")),"workerFound":found,"worker":worker,"bundledTestFolder":folder})
+    }
+    #[cfg(target_arch = "wasm32")]
+    json!({"platformSupported":false,"workerFound":false,"worker":null,"bundledTestFolder":null})
 }
 
 fn load_native(s: &mut Session, p: &Value) -> Result<Value> {
@@ -116,10 +135,7 @@ fn load_native(s: &mut Session, p: &Value) -> Result<Value> {
         if !candidate.enabled || candidate.compatibility == discovery::Compatibility::Unsupported {
             return Err(bad(C, "plugin is disabled or its PE header is unsupported"));
         }
-        let executable = std::env::var_os("EFFECTCRAFT_AEX_WORKER")
-            .map(std::path::PathBuf::from)
-            .or_else(|| std::env::current_exe().ok().map(|p| p.with_file_name("effectcraft-aex-worker.exe")))
-            .ok_or_else(|| bad(C, "cannot locate native worker"))?;
+        let executable = worker_executable().ok_or_else(|| bad(C, "cannot locate native worker"))?;
         let effect = match effectcraft_ae_bridge::native::NativeEffect::load(executable, path.clone()) {
             Ok(effect) => effect,
             Err(error) => {
@@ -131,10 +147,9 @@ fn load_native(s: &mut Session, p: &Value) -> Result<Value> {
             }
         };
         let id = effect.manifest().id.clone();
-        if let Some(existing) = s.ae_native_effects.get(&id) {
-            existing.set_enabled(true);
-            return Ok(json!({"effect":id,"status":existing.status()}));
-        }
+        let registered = s.ae_native_effects.contains_key(&id);
+        let effect = s.ae_native_effects.get(&id).cloned().unwrap_or(effect);
+        effect.set_enabled(true);
         // One explicit load also tests a tiny real frame. This proves execution,
         // never visual equivalence or compatibility with other plugins.
         let defaults: Vec<_> = effect
@@ -161,13 +176,27 @@ fn load_native(s: &mut Session, p: &Value) -> Result<Value> {
             candidate.diagnostic = effect.status().diagnostic;
         }
         rendered.map_err(|e| bad(C, e))?;
-        effectcraft_effects::plugin::register_plugin(effect.clone()).map_err(|e| bad(C, e))?;
-        s.ae_native_effects.insert(id.clone(), effect);
+        if !registered {
+            effectcraft_effects::plugin::register_plugin(effect.clone()).map_err(|e| bad(C, e))?;
+            s.ae_native_effects.insert(id.clone(), effect);
+        }
         s.layer_cache.clear();
         s.events.push(crate::Event::PurgeCaches);
         s.bump();
         Ok(json!({"effect":id,"loaded":true,"initialized":true,"parameters":defaults.len(),"rendered":true,"fidelityVerified":false,"compatibility":"partial"}))
     }
+}
+
+fn load_and_apply_native(s: &mut Session, p: &Value) -> Result<Value> {
+    let (_, layers) = layers_p(s, p)?;
+    if layers.is_empty() {
+        return Err(bad("effect.aex.loadAndApply", "select a layer before loading and applying a plugin"));
+    }
+    let mut loaded = load_native(s, p)?;
+    let effect = loaded.get("effect").and_then(Value::as_str).ok_or_else(|| bad("effect.aex.loadAndApply", "native load returned no registered effect"))?;
+    let applied = s.execute("effect.apply", json!({"effect":effect,"layers":layers.iter().map(|id|id.0).collect::<Vec<_>>()}))?;
+    loaded["applied"] = applied;
+    Ok(loaded)
 }
 
 /// Apply only explicitly mapped properties from the data-only external preset carrier.
@@ -238,6 +267,9 @@ fn apply_preset(s: &mut Session, p: &Value) -> Result<Value> {
         return Err(bad(C, "not enough IDs for preset effects"));
     }
     let applied = !properties.is_empty() || !effects.is_empty();
+    let property_count = properties.len().saturating_mul(ids.len());
+    let keyframe_count = properties.iter().fold(0_usize, |total, (_, p)| total.saturating_add(p.keys.len())).saturating_mul(ids.len());
+    let mut revealed = Vec::new();
     let now = s.time();
     let report: Value = serde_json::from_str(&converted.report_json).map_err(|e| bad(C, e.to_string()))?;
     let record = json!({"source":path,"preset":metadata,"conversionReport":report}).to_string();
@@ -260,6 +292,7 @@ fn apply_preset(s: &mut Session, p: &Value) -> Result<Value> {
                 }
                 target.value = source.value.clone();
                 target.keys = keys;
+                revealed.push(json!({"layer":id.0,"prop":target.uid}));
                 target.expr = source.expr.clone();
                 if let Some(expression) = &mut target.expr {
                     expression.enabled = false;
@@ -298,17 +331,29 @@ fn apply_preset(s: &mut Session, p: &Value) -> Result<Value> {
         }
         Ok(())
     })?;
+    if !revealed.is_empty() {
+        s.events.push(crate::Event::Frontend {
+            command: "timeline.revealProps".into(),
+            params: json!({"props":revealed,"layers":ids.iter().map(|id|id.0).collect::<Vec<_>>()}),
+        });
+    }
     let summary = if applied {
-        "Mapped preset properties applied. Inspect warnings before relying on timing or fidelity."
+        format!(
+            "Applied {property_count} mapped transform property/properties and {keyframe_count} transform keyframe(s). Added {} effect(s). Inspect the details for timing and fidelity limits.",
+            effects.len().saturating_mul(ids.len())
+        )
+    } else if unavailable.as_array().is_some_and(|effects| !effects.is_empty()) {
+        "Preset preserved as data only. Required effects are unavailable; rendered pixels were not changed.".to_string()
     } else {
-        "Preset preserved as data only. Required effects are unavailable; rendered pixels were not changed."
+        "Preset preserved as data only. No supported property/effect mapping was produced; rendered pixels were not changed. Inspect the property diagnostics."
+            .to_string()
     };
     s.events.push(crate::Event::Frontend {
         command: "app.showReport".into(),
         params: json!({"title":"After Effects Preset Report","text":warnings.join("\n"),"summary":format!("{summary}\n{}",effectcraft_ae_bridge::warning_summary(&warnings))}),
     });
     Ok(
-        json!({"applied":applied,"preserved":true,"layers":ids.iter().map(|id|id.0).collect::<Vec<_>>(),"unavailableEffects":unavailable,"warnings":warnings,"timingVerified":false}),
+        json!({"applied":applied,"preserved":true,"layers":ids.iter().map(|id|id.0).collect::<Vec<_>>(),"propertiesApplied":property_count,"keyframesApplied":keyframe_count,"effectsApplied":effects.len().saturating_mul(ids.len()),"mappedPaths":paths,"sourceTicksPerSecond":metadata.get("sourceTicksPerSecond"),"unavailableEffects":unavailable,"warnings":warnings,"timingVerified":false}),
     )
 }
 
@@ -322,7 +367,7 @@ pub fn specs() -> Vec<CommandSpec> {
         cmd!("effect.aex.scan", "Scan Native Plugins", [], None, "{installed? (bool)} — inspect files without executing DLLs", always, scan),
         cmd!("effect.aex.list", "List Native Plugins", [], None, "{} — candidates, runtime stage results and diagnostics", always, |s, _| {
             refresh_native(s);
-            Ok(json!({"folders": s.prefs.after_effects.folders, "scan": s.ae_plugins}))
+            Ok(json!({"folders": s.prefs.after_effects.folders, "scan": s.ae_plugins, "runtime": runtime_info()}))
         }),
         cmd!("effect.aex.enable", "Enable Native Plugin", [], None, "{path, enabled (bool)} — availability preference only, never loads code", always, toggle),
         cmd!(
@@ -333,6 +378,18 @@ pub fn specs() -> Vec<CommandSpec> {
             "{path} — explicitly execute a scanned plugin in the external Windows worker; CPU Smart Render and float sliders only",
             native_available,
             load_native
+        ),
+        cmd!(
+            "effect.aex.loadAndApply",
+            "Load, Test and Apply Native Plugin",
+            [],
+            None,
+            "{path,layers?} — explicitly load/test a scanned AEX, then add its registered effect to selected layers",
+            |s| {
+                native_available(s)?;
+                has_layers(s)
+            },
+            load_and_apply_native
         ),
         cmd!(
             "anim.applyAfterEffectsPreset",

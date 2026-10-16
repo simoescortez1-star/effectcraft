@@ -27,6 +27,12 @@ def apply(checkout):
     if text.count(anchor) != 1:
         raise RuntimeError("pinned adapter entry anchor changed")
     text = text.replace(anchor, anchor + '\n    if bytes.get(8..12) == Some(b"FaFX") { return effectcraft_compat::preset(bytes); }')
+    # AE saves 2D Position/Anchor/Scale vectors as two components in some presets.
+    # Keep the target's existing third component instead of rejecting the vector.
+    anchor = '        ([x, y, z], Value::Vec3(_)) => Ok(Value::Vec3([*x, *y, *z])),'
+    if text.count(anchor) != 1:
+        raise RuntimeError("pinned numeric vector anchor changed")
+    text = text.replace(anchor, anchor + '\n        ([x, y], Value::Vec3([_, _, z])) => Ok(Value::Vec3([*x, *y, *z])),')
     text = text.replace('''                    // No active path: opening the ecproj must not resolve paths from the AEP.''', '''                    // Retain saved media references for the editor's explicit relinking workflow.''')
     text = text.replace('''                        missing: true,
                         width: f.and_then''', '''                        path: f.and_then(|f| f.path.clone()).unwrap_or_default(),

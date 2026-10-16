@@ -79,8 +79,14 @@ platforms. Duplicate filenames never autoassign. Unsupported or incomplete metad
 still require **Replace Footage → File**. Existing interpretation and sequence ranges persist.
 
 **Animation → Apply After Effects Preset** and FFX drops use the same external process.
-The FaFX parser extracts named settings blocks without executing expressions. Recognized
-transform properties and the existing narrow Gaussian mapper supply a carrier project.
+The FaFX parser extracts named settings blocks without executing expressions. Properties
+support both direct `tdbs` storage and the `sspc` envelope, including nested
+`tdsi` match-name paths and end-of-path markers. Display names do not select mappings.
+Saved nonzero `beso`/`tdb4` clock fields must agree; conflicting clocks reject the preset.
+The uploaded Scale regression uses 30720 ticks/s, rather than the former fixed 8000.
+The engine also reveals applied properties in the timeline and reports actual property/key counts.
+Recognized transform properties and the existing narrow Gaussian mapper supply a carrier project.
+Two-component vectors retain the target's third component when mapped to a Vec3 property.
 The engine applies only the explicit property map/effect groups, shifts keys to each target
 layer's current time, assigns fresh IDs and supports undo/redo and reopening. Selection is
 limited to 16 layers. Unknown effects are retained as decoded trees plus exact source hex
@@ -88,8 +94,10 @@ in the layer comment; the result distinguishes `applied` from `preserved`.
 
 The supplied Sapphire `S_Shake` is **preserved only**, with 84 parameter children and its
 saved animation. No Sapphire rendering was tested. It is not replaced by an approximate
-shake. Automatic matching to commercial AEX parameter layouts is pending. The FFX clock
-of 8000 ticks/s is explicitly assumed; raw ticks remain available for future correction.
+shake. Automatic matching to commercial AEX parameter layouts is pending. Presets without
+any saved clock retain an explicit 8000-tick fallback warning. Saved offsets are added to
+the target layer's local current time; they are not rebased to their first key. Raw ticks,
+clock provenance and bytes are preserved. AE application/curve equivalence remains unverified.
 The FFX path is limited to 1 MiB input, 6 MiB decoded metadata, 8 MiB history per target
 layer and 64 MiB preservation per command. AEP conversion retains 256 MiB input,
 128 MiB project, 8 MiB report and 10,000-warning limits.
@@ -101,8 +109,12 @@ against Microsoft's PE/COFF specification. It reads 64 + 26 header bytes and nev
 LoadLibrary. Limits: 64 folders, depth 16, 20,000 entries, 4096 candidates; symlinks are skipped.
 PE validity establishes candidacy, not ABI/effect compatibility.
 
-Add a folder in Plugin Manager, scan, then explicitly click **Load and test**. The separate
-worker loads the chosen library, runs initialization and parameter setup, and renders a
+Add a folder in Plugin Manager, scan, then explicitly click **Load and test**. The
+worker location is reported by `effect.aex.list`. **Scan bundled test plugin** discovers
+the package's original Gain fixture without running it. **Load, test and apply** executes
+the explicit real-frame check, then runs the ordinary `effect.apply` command on selected
+layers. Repeating **Load and test** re-renders and returns a consistent status contract.
+The separate worker loads the chosen library, runs initialization and parameter setup, and renders a
 2×2 test frame. Only successful plugins enter the normal effect registry under
 **Native AEX (experimental)**. Stage fields reflect observed execution; visual fidelity
 remains unverified. The availability checkbox disables already loaded native effects too.
@@ -142,13 +154,16 @@ cargo xtask ci
 python packaging/after-effects/generate_fixtures.py --out /path/to/fixtures
 # Set EFFECTCRAFT_AEP_CONVERTER and EFFECTCRAFT_TEST_FFX=/path/to/fixtures/opacity.ffx
 cargo test --release -p effectcraft-engine --lib ffx_external_generated_end_to_end -- --ignored
+cargo test --release -p effectcraft-engine --lib ffx_direct_transform_presets_render_and_preserve_saved_timebase -- --ignored
 ```
 
 The private test `user_after_effects_inputs_preserve_measured_structure_and_unavailable_effect`
 requires `EFFECTCRAFT_TEST_USER_AEP` and `EFFECTCRAFT_TEST_USER_FFX`; it expects the exact
 user-supplied fixtures, not arbitrary projects. The older ignored AEP test expects its
 1920×1080, 30 fps upstream synthetic fixture via `EFFECTCRAFT_TEST_AEP`.
-`validate_windows.py` enforces the generated FFX test and native Gain test (pixels at
+The private `user_scale_ffx_creates_saved_keys_and_renders_animated_pixels` test needs
+`EFFECTCRAFT_TEST_USER_SCALE` set to the uploaded Scale preset; the input is not redistributed.
+`validate_windows.py` enforces both generated FFX tests and the native Gain test (pixels at
 multiple times, worker exit/recovery, disable, undo, persistence) before delivery.
 
 The standard CI headless environment may skip GPU comparisons without an adapter.

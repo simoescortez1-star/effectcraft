@@ -5,6 +5,18 @@ a distribuição anterior é preservada. `build.json` identifica o commit exato 
 
 ## Alterações funcionais
 
+- Correção prioritária de FFX nativo: o leitor agora aceita propriedades `tdbs` diretas,
+  além do envelope `sspc` usado por efeitos. O `scale.ffx` anexado usa esse caminho que
+  faltava; a versão anterior falhava com `no supported preset property settings blocks`.
+  Não há condição por nome de arquivo: o mesmo mecanismo decodifica Scale, Position,
+  Anchor Point, Rotation e Opacity pelos match names e reutiliza a conversão AEP.
+- O clock deixa de ser sempre 8.000: os campos salvos de `beso` e `tdb4` são conferidos.
+  `scale.ffx` usa 30.720 ticks/s; `s shake.ffx` usa 23.976. Campos conflitantes são erro
+  antes de editar o projeto. Sem um campo salvo, o fallback antigo permanece explicitamente
+  diagnosticado como hipótese; isso não estabelece equivalência temporal com o AE.
+- A aplicação informa quantas propriedades/keyframes foram criados e revela as propriedades
+  afetadas na timeline. Um preset sem mapeamento de propriedade deixa de ser diagnosticado
+  automaticamente como falta de plugin quando não contém efeitos indisponíveis.
 - FFX binário `RIFX/FaFX`: leitura de árvores salvas de propriedades no conversor externo,
   parâmetros, valores, keyframes e expressões desabilitadas. Transformações reconhecidas
   são aplicadas às camadas selecionadas a partir do tempo atual. O mapeador Gaussian
@@ -33,6 +45,11 @@ a distribuição anterior é preservada. `build.json` identifica o commit exato 
 - Plugin Manager mostra estágios observados e oferece **Load and test**. A varredura
   continua sem executar plugins. Relatórios AEP/FFX têm resumo e detalhes expansíveis;
   os avisos completos continuam preservados.
+- Plugin Manager mostra se o worker foi encontrado, oferece busca passiva do plugin de
+  teste incluído e **Carregar, testar e aplicar** nas camadas selecionadas. A ação executa
+  primeiro a prova real de render e só então adiciona o efeito. Repetir **Carregar e testar**
+  testa outro frame e retorna os mesmos campos de status; não reutiliza uma resposta antiga
+  sem render. Esses caminhos continuam limitados ao subconjunto AEX já implementado.
 
 ## Anexos analisados
 
@@ -42,6 +59,7 @@ Os arquivos privados não são incluídos no repositório nem na Release.
 | --- | --- |
 | `test.aep`, 128.578 bytes | Duas composições 1440×1440 a 60 fps, duas camadas, 14 propriedades mapeadas, dois keyframes de escala e 54 avisos. Uma imagem referenciada não foi fornecida. O segundo keyframe fica em 59/60 s; a escala X chega a 156%. |
 | `s shake.ffx`, 47.472 bytes | Um efeito `S_Shake`, 84 filhos de parâmetros, dois keyframes no parâmetro `S_Shake-0050`, ticks originais 0 e 5600. Todos os bytes, inclusive XMP ao final, são preservados. |
+| `scale.ffx`, 4.751 bytes | Propriedade `ADBE Scale`, payload `tdbs` direto, três dimensões, dois keyframes: ticks 19.456 e 27.136, valores percentuais `[100,100,100]` e `[380,100,100]`, códigos temporais 2/2 e handles preservados. Clock salvo 30.720 ticks/s: offsets 38/60 s e 53/60 s, intervalo de 0,25 s. |
 | TXT de diagnóstico | 3.784 linhas: 2.516 ocorrências de propriedade não mapeada, 214 estados Unsupported, 11 Partial, 70 definições parciais de efeito, duas ocorrências de valor incompleto e 174 avisos de duração de marcador. Material Options aparece em 1.806 linhas; Time Remapping em 107; Position_0 e Position_1 em 129 cada. As categorias se sobrepõem. |
 
 O TXT se refere a outro projeto maior: seus offsets chegam além de 2 MB e ele relata
@@ -49,6 +67,11 @@ O TXT se refere a outro projeto maior: seus offsets chegam além de 2 MB e ele r
 
 SHA-256 do AEP: `cd136a5a51c997fce14b919373784042a801e08f324f4897bbba1b928f7d6558`.
 SHA-256 do FFX: `f2dce9d5602c32c034433f87e3255b530f924e4a2af22c884d70bfe9d9346b01`.
+SHA-256 do Scale: `71deed38ca13e65c9b4b3520e22c093b3051b0217f86ad1fd7fe53f99de93932`.
+
+Os novos screenshots confirmam que a edição anterior abriu e que o AEP exibe animação
+de Scale no Windows 11 do usuário. O novo TXT de preset com 101 diagnósticos enumera
+`S_Shake`, não `ADBE Scale`; foi tratado separadamente do arquivo `scale.ffx`.
 
 Não foram fornecidos frames de referência do AE nem a imagem usada no AEP. Renderizar
 o projeto com essa mídia ausente verifica estrutura e estabilidade, não fidelidade visual.
@@ -63,14 +86,28 @@ Os screenshots fornecidos são diagnósticos da versão anterior, não referênc
 - `generate_fixtures.py` gera containers FFX binários originais: opacidade animada com
   Bezier e um efeito não disponível. O teste completo verifica pixels transparentes,
   intermediários e opacos, tempo inicial, persistência, undo/redo e dados indisponíveis.
+- Também gera Scale em `tdbs` direto com caminho `tdsi`/match names, clock 48.000 e offsets
+  não nulos; Position, Anchor Point, Rotation, Opacity e um clock contraditório. Os valores
+  e tempos públicos são originais e diferentes dos anexos privados.
+- O teste privado `user_scale_ffx_creates_saved_keys_and_renders_animated_pixels` passou
+  no ambiente Linux com o arquivo real: tempos exatos, valores, solução Bezier independente,
+  evento de revelação da timeline, três frames comparados a escalas explícitas de referência,
+  mudança visual ao avançar o tempo, undo/redo, reabertura e arquivo original imutável.
+  O AEP privado e a preservação de S_Shake também passaram novamente.
+- A interface foi inspecionada em captura headless Linux: aplicação do Scale real com
+  resumo de uma propriedade/duas chaves, propriedade revelada na timeline e preview de
+  um quadrado original no frame 38 passando a retângulo no 53, com X 100% → 380% e Y 100%.
+  Isso valida o fluxo visual local; não substitui a execução da GUI no Windows 11.
 - O teste privado opt-in verifica as medidas do AEP/FFX acima, preservação exata dos
   bytes do preset, ausência de substituição de S_Shake e manutenção dos arquivos originais.
 - O workflow Windows compila editor/CLI com Rust 1.95 e MSVC/CRT estático, conversor
   separado e worker/plugin com Rust 1.99. Antes de empacotar, exige os testes reais
   `ffx_external_generated_end_to_end` e
+  `ffx_direct_transform_presets_render_and_preserve_saved_timebase`, além de
   `aex_native_worker_renders_and_recovers_after_child_exit`.
-  Este último verifica pixels com Gain 0,5 em tempos distintos, saída deliberada do
-  processo filho, recuperação, undo, persistência e desativação do plugin.
+  Este último verifica carregamento/aplicação em uma ação, recarregamento com novo render,
+  pixels com Gain 0,5 em tempos distintos, saída deliberada do processo filho, recuperação,
+  undo, persistência e desativação do plugin.
 - Os logs desses testes e `WINDOWS-VALIDATION.json` ficam em `validation/` no ZIP.
   O empacotador rejeita evidência de outro commit ou teste que não executou.
   `build.json`, `CLI-SMOKE.txt` e `SHA256SUMS.txt` identificam os binários entregues.
@@ -85,8 +122,10 @@ Os screenshots fornecidos são diagnósticos da versão anterior, não referênc
 - A associação automática entre match names FFX/AEP e parâmetros de plugins comerciais
   ainda não está implementada/validada. O runtime inicial é um caminho separado,
   aplicado como efeito do registro dinâmico após carregamento manual.
-- O clock FFX de 8.000 ticks/s é uma hipótese experimental explícita. Os ticks originais
-  são preservados. A correspondência temporal com AE exige arquivos/referências adicionais.
+- Offsets salvos de FFX são somados ao tempo local atual da camada; a primeira chave não
+  é normalizada para zero. O Scale anexado começa 38/60 s após esse tempo, termina em
+  53/60 s e dura 0,25 s. Ticks e clocks originais são preservados. A equivalência completa
+  de aplicação/curvas com AE continua exigindo referências externas; não foram fornecidas.
 - Interpolação Bezier, unidades de velocidade, 3D, Material Options, texto e efeitos
   avançados ainda exigem comparações de referência; avisos não significam correção visual.
   Expressões importadas permanecem desabilitadas. AEPX não é suportado.
@@ -114,9 +153,10 @@ Os screenshots fornecidos são diagnósticos da versão anterior, não referênc
    escolhendo uma pasta raiz com os arquivos reais. Ambiguidades não são resolvidas automaticamente.
 3. Selecione uma camada e use Animation → Apply After Effects Preset para o FFX.
    O preset Sapphire ficará preservado até existir suporte validado ao plugin.
-4. Para testar o runtime, abra Plugin Manager, adicione a pasta `test-plugins` do ZIP,
-   faça Rescan e **Load and test** em EffectCraft Gain. Aplique-o em Effects & Presets →
-   Native AEX (experimental). Ajuste Gain. O valor 4 é reservado no fixture para provocar
+4. Para testar o runtime, selecione uma camada, abra Plugin Manager, use **Localizar plugin
+   de teste incluído** e **Carregar, testar e aplicar** em EffectCraft Gain. Alternativamente,
+   adicione `test-plugins`, use **Carregar e testar** e aplique pelo grupo Native AEX
+   (experimental) em Effects & Presets. Ajuste Gain para 0,5. O valor 4 provoca
    a saída do worker e exercitar recuperação; use 0–3,9 para renderização normal.
 
 Pacote portátil, sem MSI nem privilégios de administrador. Binários experimentais sem

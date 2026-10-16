@@ -166,7 +166,7 @@ fn execute(
 
 impl NativeEffect {
     pub fn load(executable: PathBuf, path: PathBuf) -> Result<Arc<Self>, String> {
-        if !cfg!(target_os = "windows") {
+        if !cfg!(all(target_os = "windows", target_arch = "x86_64")) {
             return Err("native AEX execution requires Windows x64".into());
         }
         let path = fs::canonicalize(path).map_err(|e| format!("cannot resolve native plugin: {e}"))?;

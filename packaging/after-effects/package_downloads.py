@@ -102,7 +102,7 @@ def main():
             smoke = result.stdout + result.stderr
         sha = command(root, "git", "rev-parse", "HEAD")
         validation = json.loads((options.validation / "WINDOWS-VALIDATION.json").read_text(encoding="utf-8"))
-        if validation.get("source_commit") != sha or not all(validation.get(test) is True for test in ["ffx_external_generated_end_to_end", "aex_native_worker_renders_and_recovers_after_child_exit"]):
+        if validation.get("source_commit") != sha or not all(validation.get(test) is True for test in ["ffx_external_generated_end_to_end", "ffx_direct_transform_presets_render_and_preserve_saved_timebase", "aex_native_worker_renders_and_recovers_after_child_exit"]):
             raise ValueError("required Windows render validation is missing or belongs to another source commit")
         subprocess.run(["git", "merge-base", "--is-ancestor", COMPATIBILITY, sha], cwd=root, check=True)
         build = {"source_commit": sha, "preserved_compatibility_commit": COMPATIBILITY, "target": options.target,
@@ -118,10 +118,12 @@ Descompacte o ZIP Windows completamente em uma pasta gravavel e abra Launch.cmd.
 Pacote portatil: nao requer MSI nem privilegios de administrador. Nao inclui plugins comerciais.
 AEP e FFX usam o conversor separado incluido. Suporte parcial; AEPX ainda indisponivel.
 FFX: propriedades reconhecidas sao aplicadas; efeitos indisponiveis ficam preservados como dados.
+Scale em tdbs direto e clocks salvos agora sao lidos. A timeline revela as propriedades aplicadas.
+No Scale anexado, as chaves ficam 38/60 s e 53/60 s apos o tempo atual; intervalo de 0,25 s.
 O preset S_Shake enviado ainda exige um runtime Sapphire validado; nao ha substituicao visual.
 AEX: Plugin Manager > Add folder > Rescan > Load and test executa explicitamente o plugin.
-Para testar o primeiro caminho, selecione a pasta test-plugins deste ZIP e carregue EffectCraft Gain.aex.
-Depois aplique-o em Effects & Presets > Native AEX (experimental), com uma camada selecionada.
+Para testar, selecione uma camada, use Localizar plugin de teste incluido e Carregar, testar e aplicar.
+EffectCraft Gain.aex tambem pode ser aplicado por Effects & Presets > Native AEX (experimental).
 Somente CPU Smart Render, sliders float e frames de ate 4.194.304 pixels estao habilitados.
 O plugin Gain e original e redistribuivel; nao representa compatibilidade com plugins comerciais.
 Leia build.json e CLI-SMOKE.txt para a validacao desta compilacao.
