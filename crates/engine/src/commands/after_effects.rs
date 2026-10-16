@@ -51,6 +51,12 @@ fn refresh_native(s: &mut Session) {
             candidate.rendered = status.rendered;
             candidate.compatibility = discovery::Compatibility::Partial;
             candidate.diagnostic = status.diagnostic;
+            if let Some(identity) = effect.identity() {
+                let metadata = candidate.metadata.get_or_insert_with(Default::default);
+                if !metadata.effects.contains(identity) {
+                    metadata.effects.push(identity.clone());
+                }
+            }
         }
     }
     #[cfg(target_arch = "wasm32")]
@@ -256,6 +262,13 @@ fn apply_preset(s: &mut Session, p: &Value) -> Result<Value> {
         }
     }
     let unavailable = metadata.get("unavailableEffects").cloned().unwrap_or_else(|| json!([]));
+    // Correlate exact identities only. Presence or a successful defaults render is
+    // not sufficient evidence for applying a commercial effect's saved controls.
+    let native_effects:Vec<_>=unavailable.as_array().into_iter().flatten().filter_map(Value::as_str).map(|match_name| {
+        let modules:Vec<_>=s.ae_plugins.plugins.iter().filter(|p|p.metadata.as_ref().is_some_and(|m|m.effects.iter().any(|e|e.match_name==match_name && e.kind=="eFKT")))
+            .map(|p|json!({"path":p.path,"loaded":p.loaded,"initialized":p.initialized,"rendered":p.rendered})).collect();
+        json!({"matchName":match_name,"matchingModules":modules,"presetBindingSupported":false,"reason":"Native type/ID mapping and custom preset data are not yet verified. Preset remains preserved; no replacement effect was created."})
+    }).collect();
     let mut uid_count = effects.len() as u64;
     let mut pending: Vec<_> = effects.iter().collect();
     while let Some(group) = pending.pop() {
@@ -353,7 +366,7 @@ fn apply_preset(s: &mut Session, p: &Value) -> Result<Value> {
         params: json!({"title":"After Effects Preset Report","text":warnings.join("\n"),"summary":format!("{summary}\n{}",effectcraft_ae_bridge::warning_summary(&warnings))}),
     });
     Ok(
-        json!({"applied":applied,"preserved":true,"layers":ids.iter().map(|id|id.0).collect::<Vec<_>>(),"propertiesApplied":property_count,"keyframesApplied":keyframe_count,"effectsApplied":effects.len().saturating_mul(ids.len()),"mappedPaths":paths,"sourceTicksPerSecond":metadata.get("sourceTicksPerSecond"),"unavailableEffects":unavailable,"warnings":warnings,"timingVerified":false}),
+        json!({"applied":applied,"preserved":true,"layers":ids.iter().map(|id|id.0).collect::<Vec<_>>(),"propertiesApplied":property_count,"keyframesApplied":keyframe_count,"effectsApplied":effects.len().saturating_mul(ids.len()),"mappedPaths":paths,"sourceTicksPerSecond":metadata.get("sourceTicksPerSecond"),"unavailableEffects":unavailable,"nativeEffects":native_effects,"warnings":warnings,"timingVerified":false}),
     )
 }
 

@@ -485,6 +485,7 @@ name = "effectcraft-aex-worker"
 version = "0.1.0"
 dependencies = [
  "aexlo",
+ "log",
  "serde",
  "serde_json",
 ]

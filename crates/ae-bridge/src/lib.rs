@@ -2,9 +2,12 @@
 //! Conversion is explicit and out of process. Discovery never loads a library.
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
+#[cfg(not(target_arch = "wasm32"))]
+pub mod diagnostic;
 pub mod discovery;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod native;
+pub mod pe;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod process;
 

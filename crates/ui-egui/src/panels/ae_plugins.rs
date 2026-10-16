@@ -70,7 +70,10 @@ pub fn show(app: &mut EffectcraftApp, ctx: &egui::Context, tokens: &Tokens) {
                         app.auto.add(&format!("aex.plugin.{i}.enabled"), r.rect, "Enable native plugin");
                         if r.changed() { actions.push(("effect.aex.enable", json!({"path": plugin.path, "enabled": enabled}))); }
                         ui.label(format!("{:?}: {}", plugin.compatibility, plugin.diagnostic));
-                        ui.label(tr_args("Plugin: {}",&[&std::path::Path::new(&plugin.path).file_stem().map(|s|s.to_string_lossy()).unwrap_or_default()]));
+                        let label = plugin.metadata.as_ref().map(|m|m.effects.iter().map(|e|format!("{} [{}] ({})",e.name,e.match_name,e.kind)).collect::<Vec<_>>().join("; ")).filter(|s|!s.is_empty())
+                            .unwrap_or_else(||std::path::Path::new(&plugin.path).file_stem().map(|s|s.to_string_lossy().to_string()).unwrap_or_default());
+                        let label=plugin.metadata.as_ref().and_then(|m|m.file_version.as_ref()).map(|v|format!("{label} · {v}")).unwrap_or(label);
+                        ui.label(tr_args("Plugin: {}",&[&label]));
                         ui.label(tr_args("Loaded: {} · Initialized: {} · Parameters: {} · Rendered: {} · Visual fidelity: unverified",&[&plugin.loaded,&plugin.initialized,&plugin.parameters,&plugin.rendered]));
                         let executable=plugin.can_load() && platform && worker;
                         ui.horizontal(|ui| {

@@ -13,6 +13,7 @@ members = ["test-plugin"]
 aexlo = { git = "https://github.com/potistudio/aexlo", rev = "28e9f9a4a371d0ecae0d2b183e167755b3a7cac3" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+log = "0.4"
 
 [lints.rust]
 unsafe_code = "forbid"

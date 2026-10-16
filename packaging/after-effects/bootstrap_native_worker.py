@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 import shutil
 import subprocess
+from patch_native_host import apply as patch_host
 
 REVISION = "28e9f9a4a371d0ecae0d2b183e167755b3a7cac3"
 
@@ -34,6 +35,7 @@ def main():
             raise RuntimeError("pinned aexlo Windows type anchor changed")
         text = text.replace(old, new)
     path.write_text(text, encoding="utf-8")
+    patch_host(checkout)
     worker = work / "worker"
     shutil.copytree(source / "native-worker", worker, ignore=shutil.ignore_patterns("target", "Cargo.lock"))
     path = worker / "Cargo.toml"

@@ -4,6 +4,9 @@ This edition adds external AEP import, partial binary FFX application and an opt
 Windows AEX worker. It does not provide general AE or commercial-plugin compatibility.
 The Portuguese [technical report](../packaging/after-effects/RELATORIO-avancado.md)
 records the measured user fixtures, validation requirements and remaining limitations.
+The newer [S_Shake analysis and local diagnostic guide](../packaging/after-effects/RELATORIO-S_Shake.md)
+records the actual preset values, two Amplitude keys, reference-video measurements and
+the remaining block on native Sapphire preset application. It does not claim compatibility.
 
 ## Architecture and provenance
 
@@ -22,6 +25,8 @@ library is linked into the editor.
   experimental Bezier mapping. The bootstrap applies these only in an external checkout.
 - External native host: [aexlo, 28e9f9a4a371d0ecae0d2b183e167755b3a7cac3](https://github.com/potistudio/aexlo/tree/28e9f9a4a371d0ecae0d2b183e167755b3a7cac3),
   MIT, built with Rust 1.99. Two explicit Windows FourCC casts are applied by the bootstrap.
+  `patch_native_host.py` also exposes exact registration metadata, persistent parameter IDs,
+  the declared version and separately callable setup stages in this external workspace.
   The worker, its dependency graph and original Gain test plugin have a separate Cargo
   workspace. Native FFI/unsafe resides in external dependencies/macros.
 - No Adobe SDK sample code, commercial binaries, artwork, private media or user-created
@@ -36,6 +41,13 @@ remains available. Each successful native delivery workflow publishes a separate
 `ae-native-<commit>`. Inspect the actual Actions result and `build.json`; the presence of a
 workflow alone is not validation. Extract the complete portable ZIP and start `Launch.cmd`.
 No commercial plugins or MSI installer are included.
+The ZIP now includes `effectcraft-aex-diagnostic.exe` and `Diagnosticar-Sapphire.cmd`.
+The diagnostic inventories PE/PiPL metadata without loading DLLs, then runs only explicitly
+selected modules or exact PiPL effect matches. Its generated JSON contains dependency search
+hints, actual registration identity, setup checkpoints, native parameter types/IDs and a
+defaults-only render attempt. A bundled Gain self-test verifies changed pixels at two times.
+It can decode a supplied FFX, but does not claim or perform unverified commercial parameter
+binding. Registration-only modules without PiPL require an explicit `--plugin` path.
 
 For a source build install Visual Studio C++ Build Tools/Windows SDK, Git, Python,
 Rust 1.95 with the Windows MSVC target, and Rust 1.99 for the separate native worker:

@@ -23,7 +23,7 @@ struct Parameter {
     max: f64,
 }
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 struct Response {
     protocol: u32,
     loaded: bool,
@@ -32,6 +32,8 @@ struct Response {
     rendered: bool,
     depth: u32,
     fidelity_verified: bool,
+    #[serde(default)]
+    identity: Option<crate::pe::EffectIdentity>,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -50,6 +52,7 @@ pub struct NativeEffect {
     manifest: PluginManifest,
     status: Mutex<NativeStatus>,
     enabled: AtomicBool,
+    identity: Option<crate::pe::EffectIdentity>,
 }
 
 fn execute(
@@ -103,7 +106,9 @@ fn execute(
             if !status.success() {
                 let log = read_bounded(&log_path, 1024 * 1024).unwrap_or_default();
                 let message: String = String::from_utf8_lossy(&log).chars().take(4096).collect();
-                return Err(format!("native worker failed ({status}): {message}"));
+                let checkpoint = read_bounded(&response_path, 1024 * 1024).ok().and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok());
+                let stage = checkpoint.as_ref().and_then(|v| v.get("stage")).and_then(serde_json::Value::as_str).unwrap_or("unconfirmed");
+                return Err(format!("native worker failed ({status}), last stage {stage}: {message}"));
             }
             break;
         }
@@ -180,9 +185,15 @@ impl NativeEffect {
         let manifest = PluginManifest {
             api: 1,
             id: format!("org.effectcraft.aex.{:016x}", hash.finish()),
-            name: path.file_stem().map(|p| p.to_string_lossy().to_string()).unwrap_or_else(|| "AEX plugin".into()),
+            name: response
+                .identity
+                .as_ref()
+                .map(|i| i.name.clone())
+                .filter(|n| !n.trim().is_empty() && n.len() <= 1024)
+                .or_else(|| path.file_stem().map(|p| p.to_string_lossy().to_string()))
+                .unwrap_or_else(|| "AEX plugin".into()),
             category: "Native AEX (experimental)".into(),
-            version: "experimental-1".into(),
+            version: response.identity.as_ref().and_then(|i| i.version_raw).map(|v| format!("PF_VERSION raw {v}")).unwrap_or_else(|| "unknown".into()),
             author: String::new(),
             description: "External CPU Smart Render, float sliders, 32-bit premultiplied RGBA. Visual fidelity unverified.".into(),
             params: response
@@ -205,6 +216,7 @@ impl NativeEffect {
             manifest,
             status: Mutex::new(NativeStatus::default()),
             enabled: AtomicBool::new(true),
+            identity: response.identity,
         }))
     }
     pub fn status(&self) -> NativeStatus {
@@ -212,6 +224,9 @@ impl NativeEffect {
     }
     pub fn path(&self) -> &Path {
         &self.path
+    }
+    pub fn identity(&self) -> Option<&crate::pe::EffectIdentity> {
+        self.identity.as_ref()
     }
     pub fn set_enabled(&self, enabled: bool) {
         self.enabled.store(enabled, Ordering::Relaxed);

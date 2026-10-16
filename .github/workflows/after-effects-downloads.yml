@@ -23,6 +23,7 @@ jobs:
       CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS: -C target-feature=+crt-static
       AEP_WORK: ${{ github.workspace }}/../effectcraft-aep-converter
       AEX_WORK: ${{ github.workspace }}/../effectcraft-aex-worker
+      EFFECTCRAFT_DIAGNOSTIC_COMMIT: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -39,7 +40,7 @@ jobs:
       - name: Build editor and CLI with static CRT
         env:
           EFFECTCRAFT_REQUIRE_WINRES: "1"
-        run: cargo build --locked --release --target x86_64-pc-windows-msvc -p effectcraft -p effectcraft-cli
+        run: cargo build --locked --release --target x86_64-pc-windows-msvc -p effectcraft -p effectcraft-cli -p effectcraft-ae-bridge --bins
       - name: Test the bridge and engine integration on Windows
         shell: pwsh
         run: |
@@ -94,4 +95,4 @@ jobs:
             --prerelease --title "EffectCraft Windows experimental ${BUILD_SHA:0:12}" \
             --notes-file LEIA-ME.txt \
             effectcraft-windows-x64-experimental.zip effectcraft-source.zip \
-            RELATORIO.md build.json CLI-SMOKE.txt SHA256SUMS.txt LEIA-ME.txt
+            RELATORIO.md SAPPHIRE-S_SHAKE.md build.json CLI-SMOKE.txt SHA256SUMS.txt LEIA-ME.txt

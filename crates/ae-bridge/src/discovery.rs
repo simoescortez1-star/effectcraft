@@ -29,6 +29,8 @@ pub struct Candidate {
     pub parameters: bool,
     pub rendered: bool,
     pub fidelity_verified: bool,
+    #[serde(default)]
+    pub metadata: Option<crate::pe::Metadata>,
 }
 
 impl Candidate {
@@ -89,6 +91,7 @@ pub fn scan(config: &PluginConfig) -> Scan {
     let mut stack: Vec<_> = config.folders.iter().map(|p| (PathBuf::from(p), 0u8)).collect();
     let mut seen = BTreeSet::new();
     let mut visited = 0usize;
+    let mut metadata_budget = 1024 * 1024 * 1024u64;
     while let Some((dir, depth)) = stack.pop() {
         if !dir.is_absolute() {
             result.diagnostics.push(format!("{}: folder path must be absolute", dir.display()));
@@ -164,14 +167,40 @@ pub fn scan(config: &PluginConfig) -> Scan {
                 file.read_exact(&mut header).map_err(|e| format!("cannot read PE header: {e}"))?;
                 inspect_header(&header)
             })();
+            let mut metadata = None;
+            if checked.is_ok() {
+                match std::fs::metadata(&path) {
+                    Ok(m) if m.len() <= metadata_budget && m.len() <= 256 * 1024 * 1024 => {
+                        metadata_budget = metadata_budget.saturating_sub(m.len());
+                        let inspected = (|| -> Result<crate::pe::Metadata, String> {
+                            let file = std::fs::File::open(&path).map_err(|e| e.to_string())?;
+                            let mut data = Vec::new();
+                            file.take(256 * 1024 * 1024 + 1).read_to_end(&mut data).map_err(|e| e.to_string())?;
+                            if data.len() > 256 * 1024 * 1024 {
+                                return Err("plugin changed or exceeds metadata inspection limit".into());
+                            }
+                            crate::pe::inspect(&data)
+                        })();
+                        match inspected {
+                            Ok(m) => metadata = Some(m),
+                            Err(e) => result.diagnostics.push(format!("{}: metadata: {e}", path.display())),
+                        }
+                    }
+                    _ => result.diagnostics.push(format!("{}: metadata skipped (256 MiB file / 1 GiB scan read budget)", path.display())),
+                }
+            }
             let path = path.to_string_lossy().to_string();
-            let (compatibility, diagnostic) = match checked {
+            let (mut compatibility, mut diagnostic) = match checked {
                 Ok(()) => (
                     Compatibility::Untested,
                     "AMD64 PE32+ DLL candidate only. Scanning never executes code; use Load and test with the optional Windows worker.".into(),
                 ),
                 Err(e) => (Compatibility::Unsupported, e),
             };
+            if metadata.as_ref().is_some_and(|m| !m.effects.is_empty() && m.effects.iter().all(|e| e.kind != "eFKT")) {
+                compatibility = Compatibility::Unsupported;
+                diagnostic = "PiPL metadata identifies non-effect extensions only; no effect runtime will be attempted.".into();
+            }
             result.plugins.push(Candidate {
                 enabled: !config.disabled.contains(&path),
                 path,
@@ -182,6 +211,7 @@ pub fn scan(config: &PluginConfig) -> Scan {
                 parameters: false,
                 rendered: false,
                 fidelity_verified: false,
+                metadata,
             });
         }
     }
