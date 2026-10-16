@@ -1252,7 +1252,9 @@ pub fn frontend(app: &mut EffectcraftApp, ctx: &egui::Context, id: &str, p: Valu
         "app.showReport" => {
             let title = p.get("title").and_then(Value::as_str).unwrap_or("Report").to_string();
             let text = p.get("text").and_then(Value::as_str).unwrap_or_default().to_string();
-            crate::panels::dialogs::info(app, &title, &text);
+            let summary = p.get("summary").and_then(Value::as_str);
+            crate::panels::dialogs::info(app, &title, summary.unwrap_or(&text));
+            app.dialog_state.info_details = summary.map(|_| text);
             Value::Null
         }
         "window.assignWorkspaceShortcut" => {

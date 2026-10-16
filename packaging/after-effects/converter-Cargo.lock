@@ -26,6 +26,9 @@ dependencies = [
 [[package]]
 name = "aep-reader"
 version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "arrayref"

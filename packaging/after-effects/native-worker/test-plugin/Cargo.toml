@@ -1,0 +1,16 @@
+[package]
+name = "effectcraft-aex-gain-fixture"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+after-effects = "=0.4.0"
+
+[lints.rust]
+unsafe_code = "forbid"
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(does_dialog)'] }

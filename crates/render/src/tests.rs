@@ -858,6 +858,25 @@ fn timed_source_reads_preserve_other_layer_masks() {
 }
 
 #[test]
+fn native_effects_and_their_layer_dependencies_do_not_cache_fallback_frames() {
+    let (mut p, cid, comp) = setup();
+    let mut source = solid(&mut p, &comp, [1.0, 1.0, 1.0], 200, 100);
+    let mut owner = solid(&mut p, &comp, [0.0, 0.0, 0.0], 200, 100);
+    let id = "org.effectcraft.aex.synthetic-cache-regression";
+    let mut effect = Ids(&mut p.next_id).group(id, "Native fixture");
+    effect.kind = effectcraft_project::GroupKind::Effect { effect: id.into() };
+    source.props.sub_mut("effects").unwrap().children.push(effect.into());
+    add_effect_200(&mut p, &mut owner, "ec.channel.blend", &[("blendWithLayer", Value::Layer(Some(source.id.0)))]);
+    p.comp_mut(cid).unwrap().layers = vec![owner, source];
+    let comp = p.comp(cid).unwrap();
+    let ctx = crate::EvalCtx::new(&p, cid, comp, Tick::ZERO);
+    for layer in &comp.layers {
+        assert!(crate::cache::layer_key(&ctx, layer, 1.0, false, false).is_none());
+    }
+    assert!(crate::cache::input_key(&ctx, &comp.layers[1], 1.0, false, false, 0).is_some(), "source before the external effect remains cacheable");
+}
+
+#[test]
 fn layer_dependencies_remain_cacheable_and_invalidate_only_related_edits() {
     let (mut p, cid, comp) = setup();
     let mut owner = solid(&mut p, &comp, [1.0, 0.0, 0.0], 200, 100);

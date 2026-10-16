@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import io
 from pathlib import Path
 import subprocess
 import tempfile
@@ -39,8 +40,8 @@ def pe_x64(path):
             raise ValueError(f"not a PE32+ x64 executable: {path}")
 
 
-def dependencies(root, manifest, target):
-    metadata = json.loads(command(root, "cargo", "+1.95.0", "metadata", "--locked", "--format-version", "1", "--filter-platform", target,
+def dependencies(root, manifest, target, toolchain="1.95.0"):
+    metadata = json.loads(command(root, "cargo", f"+{toolchain}", "metadata", "--locked", "--format-version", "1", "--filter-platform", target,
                                   "--manifest-path", str(manifest)))
     return {f"{p['name']}-{p['version']}" for p in metadata["packages"] if p.get("source")}
 
@@ -48,6 +49,8 @@ def dependencies(root, manifest, target):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--converter-work", type=Path, required=True)
+    parser.add_argument("--native-work", type=Path, required=True)
+    parser.add_argument("--validation", type=Path, required=True)
     parser.add_argument("--notice-package", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--target", choices=["x86_64-pc-windows-msvc", "x86_64-pc-windows-gnu"], default="x86_64-pc-windows-msvc")
@@ -63,11 +66,16 @@ def main():
     bins = options.editor_bin or root / "target" / options.target / "release"
     executable_paths = {name: bins / name for name in ["effectcraft.exe", "effectcraft-cli.exe"]}
     executable_paths["aep-effectcraft.exe"] = converter_work / "target" / options.target / "release/aep-effectcraft.exe"
+    native_work = options.native_work.resolve()
+    native_bins = native_work / "target" / options.target / "release"
+    native_manifest = native_work / "worker/Cargo.toml"
+    executable_paths["effectcraft-aex-worker.exe"] = native_bins / "effectcraft-aex-worker.exe"
+    executable_paths["test-plugins/EffectCraft Gain.aex"] = native_bins / "effectcraft_aex_gain_fixture.dll"
     for path in executable_paths.values():
         pe_x64(path)
     if digest(options.notice_package) != NOTICE_SHA256:
         raise ValueError("notice source package differs from the verified original distribution")
-    required = dependencies(root, root / "Cargo.toml", options.target) | dependencies(root, converter_manifest, options.target)
+    required = dependencies(root, root / "Cargo.toml", options.target) | dependencies(root, converter_manifest, options.target) | dependencies(root, native_manifest, options.target, "1.99.0")
     with zipfile.ZipFile(options.notice_package) as notices:
         index = json.loads(notices.read("third-party-notices/index.json"))
         extra_root = Path(__file__).parent / "additional-notices"
@@ -93,20 +101,31 @@ def main():
                                     capture_output=True, text=True, errors="replace", timeout=30)
             smoke = result.stdout + result.stderr
         sha = command(root, "git", "rev-parse", "HEAD")
+        validation = json.loads((options.validation / "WINDOWS-VALIDATION.json").read_text(encoding="utf-8"))
+        if validation.get("source_commit") != sha or not all(validation.get(test) is True for test in ["ffx_external_generated_end_to_end", "aex_native_worker_renders_and_recovers_after_child_exit"]):
+            raise ValueError("required Windows render validation is missing or belongs to another source commit")
         subprocess.run(["git", "merge-base", "--is-ancestor", COMPATIBILITY, sha], cwd=root, check=True)
         build = {"source_commit": sha, "preserved_compatibility_commit": COMPATIBILITY, "target": options.target,
                  "rust": command(root, "rustc", "+1.95.0", "--version"), "native_cli_smoke_passed": not options.skip_native_smoke,
-                 "windows_11_gui_tested": False, "ffx_supported": False, "aepx_supported": False, "aex_runtime_supported": False,
+                 "windows_11_gui_tested": False, "ffx_supported": "partial-mapped-properties", "aepx_supported": False, "aex_runtime_supported": "experimental-cpu-smart-render-float-sliders",
+                 "native_validation": validation,
                  "executables": {name: {"bytes": path.stat().st_size, "sha256": digest(path)} for name, path in executable_paths.items()}}
         (out / "build.json").write_text(json.dumps(build, indent=2) + "\n", encoding="utf-8")
         (out / "CLI-SMOKE.txt").write_text(smoke + "\n", encoding="utf-8")
-        (out / "RELATORIO.md").write_bytes((root / "packaging/after-effects/RELATORIO-base-e30d8d6d.md").read_bytes())
+        (out / "RELATORIO.md").write_bytes((root / "packaging/after-effects/RELATORIO-avancado.md").read_bytes())
         readme = """EFFECTCRAFT - EDICAO EXPERIMENTAL E PARCIAL
 Descompacte o ZIP Windows completamente em uma pasta gravavel e abra Launch.cmd.
 Pacote portatil: nao requer MSI nem privilegios de administrador. Nao inclui plugins comerciais.
-AEP usa o conversor separado incluido. FFX, AEPX e execucao/renderizacao AEX nao estao implementados.
+AEP e FFX usam o conversor separado incluido. Suporte parcial; AEPX ainda indisponivel.
+FFX: propriedades reconhecidas sao aplicadas; efeitos indisponiveis ficam preservados como dados.
+O preset S_Shake enviado ainda exige um runtime Sapphire validado; nao ha substituicao visual.
+AEX: Plugin Manager > Add folder > Rescan > Load and test executa explicitamente o plugin.
+Para testar o primeiro caminho, selecione a pasta test-plugins deste ZIP e carregue EffectCraft Gain.aex.
+Depois aplique-o em Effects & Presets > Native AEX (experimental), com uma camada selecionada.
+Somente CPU Smart Render, sliders float e frames de ate 4.194.304 pixels estao habilitados.
+O plugin Gain e original e redistribuivel; nao representa compatibilidade com plugins comerciais.
 Leia build.json e CLI-SMOKE.txt para a validacao desta compilacao.
-RELATORIO.md descreve a validacao historica da base e30d8d6d, incluindo duas falhas GPU Mesa.
+RELATORIO.md descreve resultados, limites e pendencias desta etapa.
 O funcionamento da interface e a fidelidade de renderizacao no Windows 11 ainda precisam de teste.
 Os executaveis experimentais nao possuem assinatura de codigo.
 """
@@ -126,9 +145,25 @@ Os executaveis experimentais nao possuem assinatura de codigo.
                     package.write(extra_root / key / name, f"third-party-notices/{key}/{name}")
             for name in ["build.json", "CLI-SMOKE.txt", "RELATORIO.md", "LEIA-ME.txt"]:
                 package.write(out / name, name)
+            for path in sorted(options.validation.glob("*.txt")):
+                package.write(path, "validation/" + path.name)
+            package.write(options.validation / "WINDOWS-VALIDATION.json", "validation/WINDOWS-VALIDATION.json")
+            package.write(root / "packaging/after-effects/RELATORIO-base-e30d8d6d.md", "RELATORIO-base-e30d8d6d.md")
+            for path in (root / "packaging/after-effects/native-notices").iterdir():
+                package.write(path, "native-worker-notices/" + path.name)
+            # Ship the unmodified covered source for the MPL terminal-color crate.
+            native_metadata = json.loads(command(root, "cargo", "+1.99.0", "metadata", "--locked", "--format-version", "1", "--manifest-path", str(native_manifest)))
+            colored = next(p for p in native_metadata["packages"] if p["name"] == "colored")
+            source_root = Path(colored["manifest_path"]).parent
+            source_zip = io.BytesIO()
+            with zipfile.ZipFile(source_zip,"w",compression=zipfile.ZIP_DEFLATED) as archive:
+                for path in source_root.rglob("*"):
+                    if path.is_file() and (path.suffix in [".rs", ".toml", ".md"] or path.name.startswith(("LICENSE", "COPYING"))):
+                        archive.write(path, f"colored-{colored['version']}/" + path.relative_to(source_root).as_posix())
+            package.writestr("native-worker-notices/colored-source.zip", source_zip.getvalue())
             package.write(root / "docs/after-effects-compatibility.md", "ARCHITECTURE-AND-COMPATIBILITY.md")
             package.write(root / "packaging/windows/portable.txt", "portable.txt")
-            package.writestr("Launch.cmd", '@echo off\r\nset "EFFECTCRAFT_AEP_CONVERTER=%~dp0aep-effectcraft.exe"\r\n"%~dp0effectcraft.exe" %*\r\n')
+            package.writestr("Launch.cmd", '@echo off\r\nset "EFFECTCRAFT_AEP_CONVERTER=%~dp0aep-effectcraft.exe"\r\nset "EFFECTCRAFT_AEX_WORKER=%~dp0effectcraft-aex-worker.exe"\r\n"%~dp0effectcraft.exe" %*\r\n')
         source = out / "effectcraft-source.zip"
         with source.open("wb") as file:
             subprocess.run(["git", "archive", "--format=zip", "--prefix=effectcraft/", "HEAD"], cwd=root, stdout=file, check=True)

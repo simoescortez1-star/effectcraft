@@ -1,0 +1,22 @@
+[package]
+name = "effectcraft-aex-worker"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace]
+members = ["test-plugin"]
+
+[dependencies]
+aexlo = { git = "https://github.com/potistudio/aexlo", rev = "28e9f9a4a371d0ecae0d2b183e167755b3a7cac3" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[profile.release]
+lto = "off"
+codegen-units = 16

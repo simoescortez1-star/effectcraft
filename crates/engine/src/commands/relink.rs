@@ -12,6 +12,11 @@ use crate::{Result, Session, cmd};
 const COMMAND: &str = "file.relinkFootage";
 const ENTRY_LIMIT: usize = 100_000;
 
+// Saved references keep the source platform's separators after a project moves.
+fn file_name(path: &str) -> &str {
+    path.rsplit(['/', '\\']).next().unwrap_or("")
+}
+
 fn enabled(_: &Session) -> std::result::Result<(), String> {
     if cfg!(target_arch = "wasm32") { Err("folder relinking requires the desktop filesystem".into()) } else { Ok(()) }
 }
@@ -67,7 +72,11 @@ fn sequence_at(old: &Footage, path: &str) -> Option<Vec<String>> {
     old.sequence
         .iter()
         .map(|file| {
-            let mapped = parent.join(Path::new(file).file_name()?);
+            let name = file_name(file);
+            if name.is_empty() {
+                return None;
+            }
+            let mapped = parent.join(name);
             std::fs::symlink_metadata(&mapped).is_ok_and(|m| m.is_file()).then(|| mapped.to_str().map(str::to_string)).flatten()
         })
         .collect()
@@ -102,7 +111,7 @@ fn run(s: &mut Session, p: &Value) -> Result<Value> {
             }
             let supported = matches!(old.kind, FootageKind::Still | FootageKind::Sequence | FootageKind::Video | FootageKind::Audio)
                 && old.layer.is_none() && old.page == 0;
-            let name = Path::new(&old.path).file_name().and_then(|n| n.to_str()).unwrap_or("");
+            let name = file_name(&old.path);
             let paths = index.get(name).cloned().unwrap_or_default();
             let mut candidates = vec![];
             let mut accepted = vec![];
@@ -243,6 +252,19 @@ mod tests {
     fn get(s: &Session, id: ItemId) -> Footage {
         let ItemKind::Footage(f) = &s.project.item(id).unwrap().kind else { panic!("footage") };
         f.clone()
+    }
+
+    #[test]
+    fn windows_saved_reference_relinks_on_other_platforms() {
+        let dir = Fixture::new();
+        let (mut s, id, old) = setup(&dir, "plate.png");
+        if let ItemKind::Footage(f) = &mut Arc::make_mut(&mut s.project).item_mut(id).unwrap().kind {
+            f.path = r"Z:\missing\shot\plate.png".into();
+            f.missing = true;
+        }
+        let target = dir.file("new/deep/plate.png", b"valid");
+        assert_eq!(search(&mut s, &dir, false)["relinked"], 1);
+        assert_eq!(get(&s, id), Footage { path: target, missing: false, ..old });
     }
 
     #[test]

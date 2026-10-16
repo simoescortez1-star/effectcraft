@@ -493,6 +493,8 @@ pub struct Session {
     pub ae_converter: Option<Arc<dyn effectcraft_ae_bridge::ProjectConverter>>,
     /// Last passive native-plugin scan, separate from renderable effects.
     pub ae_plugins: effectcraft_ae_bridge::discovery::Scan,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub ae_native_effects: std::collections::BTreeMap<String, Arc<effectcraft_ae_bridge::native::NativeEffect>>,
     /// ScriptUI windows and panels opened by scripts (see [`scriptui`]).
     pub script_ui: scriptui::ScriptUi,
     /// The last physical-memory reading (Settings ▸ Memory & CPU budgets); `None` = unknown
@@ -615,6 +617,8 @@ impl Default for Session {
             plugin_loader: None,
             ae_converter: None,
             ae_plugins: Default::default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            ae_native_effects: Default::default(),
             script_ui: scriptui::ScriptUi::default(),
             sys_memory: None,
             key_move: None,

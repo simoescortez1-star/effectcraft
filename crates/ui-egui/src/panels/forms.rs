@@ -120,6 +120,7 @@ pub fn form(app: &mut EffectcraftApp, title: &str, command: &str, base: Value, f
 /// Open a message box.
 pub fn info(app: &mut EffectcraftApp, title: &str, body: &str) {
     app.dialog_state.info = (title.into(), body.into());
+    app.dialog_state.info_details = None;
     app.dialog = Some(Dialog::Info);
 }
 
@@ -923,11 +924,18 @@ pub(crate) fn close_info(app: &mut EffectcraftApp) {
 
 pub fn show_info(app: &mut EffectcraftApp, ctx: &egui::Context, t: &Tokens) {
     let (title, body) = app.dialog_state.info.clone();
+    let details = app.dialog_state.info_details.clone();
     // Enter presses OK, the default (and only) button.
     let mut close = !ctx.egui_wants_keyboard_input() && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter));
     // The text wraps within this small dialog; avoid a horizontal scrollbar changing its height.
     super::dialogs::modal_vertical(ctx, &title, vec2(440.0, 160.0), t, |ui| {
         ui.label(tr(&body));
+        if let Some(details) = &details {
+            let response = egui::CollapsingHeader::new(tr("Technical details")).id_salt("report.details").show(ui, |ui| {
+                ui.label(details);
+            });
+            app.auto.add("report.details", response.header_response.rect, "Show all report diagnostics");
+        }
         ui.add_space(16.0);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if ui.add(egui::Button::new(egui::RichText::new(tr("   OK   ")).color(Color32::WHITE)).fill(t.accent)).clicked() {

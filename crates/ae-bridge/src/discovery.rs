@@ -159,7 +159,10 @@ pub fn scan(config: &PluginConfig) -> Scan {
             })();
             let path = path.to_string_lossy().to_string();
             let (compatibility, diagnostic) = match checked {
-                Ok(()) => (Compatibility::Untested, "AMD64 PE32+ DLL candidate only; no native worker is installed. No code executed.".into()),
+                Ok(()) => (
+                    Compatibility::Untested,
+                    "AMD64 PE32+ DLL candidate only. Scanning never executes code; use Load and test with the optional Windows worker.".into(),
+                ),
                 Err(e) => (Compatibility::Unsupported, e),
             };
             result.plugins.push(Candidate {

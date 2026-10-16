@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 import shutil
 import subprocess
+import importlib.util
 
 REVISION = "16cfdb6983621370352a8dd26dcd01845378bb83"
 REPOSITORY = "https://github.com/yueli-fx/aep-reader"
@@ -43,6 +44,11 @@ def main():
             raise RuntimeError(f"missing expected upstream dependency path: {crate}")
         text = text.replace(old, (source / "crates" / crate).as_posix())
     manifest.write_text(text, encoding="utf-8")
+    overlay = source / "packaging/after-effects/converter-overlay/apply_overlay.py"
+    spec = importlib.util.spec_from_file_location("effectcraft_converter_overlay", overlay)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.apply(checkout)
     # Start from the editor's registry versions; Cargo records the separate converter graph.
     shutil.copyfile(options.lock_file or source / "Cargo.lock", manifest.parent / "Cargo.lock")
     arguments = ["--manifest-path", str(manifest), "--target-dir", str(work / "target")]

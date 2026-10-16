@@ -2,7 +2,7 @@ name: Build downloadable EffectCraft Windows edition
 
 on:
   push:
-    branches: [feat/after-effects-compatibility]
+    branches: [feat/after-effects-compatibility, feat/ae-advanced-compatibility]
   workflow_dispatch:
 
 permissions:
@@ -22,6 +22,7 @@ jobs:
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
       CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS: -C target-feature=+crt-static
       AEP_WORK: ${{ github.workspace }}/../effectcraft-aep-converter
+      AEX_WORK: ${{ github.workspace }}/../effectcraft-aex-worker
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,12 +47,19 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Engine integration tests failed' }
       - name: Build and test the pinned separate converter
         run: python packaging/after-effects/bootstrap_converter.py --work "$env:AEP_WORK" --lock-file packaging/after-effects/converter-Cargo.lock --target x86_64-pc-windows-msvc --release
+      - uses: dtolnay/rust-toolchain@1.99.0
+        with:
+          targets: x86_64-pc-windows-msvc
+      - name: Build the pinned separate native ABI worker and original test plugin
+        run: python packaging/after-effects/bootstrap_native_worker.py --work "$env:AEX_WORK"
+      - name: Render real FFX and native AEX regression frames on Windows
+        run: python packaging/after-effects/validate_windows.py --converter-work "$env:AEP_WORK" --native-work "$env:AEX_WORK" --out "$env:RUNNER_TEMP/advanced-validation"
       - name: Retrieve the verified license notices from the original distribution
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release download ae-compat-e30d8d6d --repo simoescortez1-star/effectcraft --pattern effectcraft-windows-x64-experimental.zip --dir "$env:RUNNER_TEMP/notice-input"
       - name: Smoke-test CLI and create Windows/source ZIPs
-        run: python packaging/after-effects/package_downloads.py --converter-work "$env:AEP_WORK" --notice-package "$env:RUNNER_TEMP/notice-input/effectcraft-windows-x64-experimental.zip" --out dist/after-effects
+        run: python packaging/after-effects/package_downloads.py --converter-work "$env:AEP_WORK" --native-work "$env:AEX_WORK" --validation "$env:RUNNER_TEMP/advanced-validation" --notice-package "$env:RUNNER_TEMP/notice-input/effectcraft-windows-x64-experimental.zip" --out dist/after-effects
       - name: Upload downloadable packages
         uses: actions/upload-artifact@v4
         with:
@@ -63,7 +71,7 @@ jobs:
 
   release:
     needs: windows
-    if: github.repository == 'simoescortez1-star/effectcraft' && github.ref == 'refs/heads/feat/after-effects-compatibility'
+    if: github.repository == 'simoescortez1-star/effectcraft' && (github.ref == 'refs/heads/feat/after-effects-compatibility' || github.ref == 'refs/heads/feat/ae-advanced-compatibility')
     runs-on: ubuntu-24.04
     permissions:
       contents: write

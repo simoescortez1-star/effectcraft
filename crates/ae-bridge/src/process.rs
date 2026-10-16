@@ -14,9 +14,9 @@ pub struct ExternalConverter {
     pub timeout: Duration,
 }
 
-struct Scratch(PathBuf);
+pub(crate) struct Scratch(pub(crate) PathBuf);
 impl Scratch {
-    fn create() -> Result<Self, String> {
+    pub(crate) fn create() -> Result<Self, String> {
         static NEXT: AtomicU64 = AtomicU64::new(0);
         for _ in 0..100 {
             let id = NEXT.fetch_add(1, Ordering::Relaxed);
@@ -36,7 +36,7 @@ impl Drop for Scratch {
     }
 }
 
-struct Worker(Child);
+pub(crate) struct Worker(pub(crate) Child);
 impl Drop for Worker {
     fn drop(&mut self) {
         let _ = self.0.kill();

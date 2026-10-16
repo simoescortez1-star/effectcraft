@@ -46,6 +46,7 @@ pub struct DialogState {
     pub form: super::forms::Form,
     /// Message box (title, body).
     pub info: (String, String),
+    pub info_details: Option<String>,
     pub camera: super::dialogs_3d::CameraDraft,
     pub light: super::dialogs_3d::LightDraft,
     pub velocity: super::key_dialogs::VelocityDraft,

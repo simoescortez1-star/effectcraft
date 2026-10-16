@@ -1170,6 +1170,7 @@ dependencies = [
 name = "effectcraft-ae-bridge"
 version = "0.10.0"
 dependencies = [
+ "effectcraft-effects",
  "serde",
  "serde_json",
 ]

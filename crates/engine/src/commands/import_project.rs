@@ -91,7 +91,8 @@ fn resolve_footage(s: &Session, project: &mut Project, dir: &std::path::Path) ->
                 continue;
             }
             if f.sequence.is_empty() {
-                if !resolve(&mut f.path) {
+                f.missing = !resolve(&mut f.path);
+                if f.missing {
                     missing.push(f.path.clone());
                 }
             } else {
@@ -99,6 +100,7 @@ fn resolve_footage(s: &Session, project: &mut Project, dir: &std::path::Path) ->
                 for frame in &mut f.sequence {
                     all &= resolve(frame);
                 }
+                f.missing = !all;
                 if !all {
                     missing.push(f.path.clone());
                 }
@@ -180,7 +182,7 @@ fn import_project(s: &mut Session, p: &Value) -> Result<Value> {
     if conversion_report.is_some() {
         s.events.push(crate::Event::Frontend {
             command: "app.showReport".into(),
-            params: json!({"title": "After Effects Import Report", "text": warnings.join("\n")}),
+            params: json!({"title": "After Effects Import Report", "text": warnings.join("\n"),"summary":format!("Imported {} composition(s). Missing media: {}.\n{}\n\nThe full conversion report is saved in the import folder comment.",comps.len(),missing.len(),effectcraft_ae_bridge::warning_summary(&warnings))}),
         });
     }
     Ok(json!({

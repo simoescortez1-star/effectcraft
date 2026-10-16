@@ -4,6 +4,9 @@ use egui::vec2;
 use serde_json::json;
 
 pub fn show(app: &mut EffectcraftApp, ctx: &egui::Context, tokens: &Tokens) {
+    if let Err(error) = app.session.execute("effect.aex.list", json!({})) {
+        app.ui.status = error.to_string();
+    }
     let folders = app.session.prefs.after_effects.folders.clone();
     let scan = app.session.ae_plugins.clone();
     let mut actions = vec![];
@@ -15,8 +18,8 @@ pub fn show(app: &mut EffectcraftApp, ctx: &egui::Context, tokens: &Tokens) {
             close = r.clicked();
         });
         body.vertical(|ui| {
-            ui.label("After Effects native plugins — experimental inventory");
-            ui.label("Scanning reads file headers only. Availability is saved for future runtime use. Native loading and rendering are not implemented in this build.");
+            ui.label("After Effects native plugins — experimental CPU runtime");
+            ui.label("Scanning reads headers only. Load and test explicitly executes a plugin in a separate process. Supported subset: CPU Smart Render, float sliders, 32-bit frames. Visual fidelity and commercial plugins remain unverified.");
             ui.horizontal(|ui| {
                 let r = ui.text_edit_singleline(&mut app.dialog_state.ae_folder);
                 app.auto.add_response("aex.folder", &r, "Plugin folder (absolute path)");
@@ -46,10 +49,14 @@ pub fn show(app: &mut EffectcraftApp, ctx: &egui::Context, tokens: &Tokens) {
                     ui.group(|ui| {
                         let mut enabled = plugin.enabled;
                         let r = ui.checkbox(&mut enabled, &plugin.path);
-                        app.auto.add(&format!("aex.plugin.{i}.enabled"), r.rect, "Available for future runtime");
+                        app.auto.add(&format!("aex.plugin.{i}.enabled"), r.rect, "Enable native plugin");
                         if r.changed() { actions.push(("effect.aex.enable", json!({"path": plugin.path, "enabled": enabled}))); }
                         ui.label(format!("{:?}: {}", plugin.compatibility, plugin.diagnostic));
-                        ui.label("Loaded: no · Initialized: no · Parameters: no · Rendered: no · Visual fidelity: unverified");
+                        ui.label(format!("Plugin: {} · Architecture: x64 candidate",std::path::Path::new(&plugin.path).file_stem().map(|s|s.to_string_lossy()).unwrap_or_default()));
+                        ui.label(format!("Loaded: {} · Initialized: {} · Parameters: {} · Rendered: {} · Visual fidelity: unverified",plugin.loaded,plugin.initialized,plugin.parameters,plugin.rendered));
+                        let r=ui.add_enabled(plugin.enabled && cfg!(target_os="windows"),egui::Button::new("Load and test"));
+                        app.auto.add(&format!("aex.plugin.{i}.load"),r.rect,"Execute plugin in external worker and test a frame");
+                        if r.clicked() { actions.push(("effect.aex.load",json!({"path":plugin.path}))); }
                     });
                 }
                 for diagnostic in &scan.diagnostics { ui.label(diagnostic); }

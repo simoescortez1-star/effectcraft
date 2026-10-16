@@ -4,6 +4,8 @@
 
 pub mod discovery;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod native;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod process;
 
 /// Maximum source size, including the snapshot passed to an external converter.
@@ -41,4 +43,29 @@ pub fn warnings(report: &str) -> Result<Vec<String>, String> {
             Ok(format!("{context}: {message}"))
         })
         .collect()
+}
+
+/// Keep every diagnostic available while making large reports readable at first glance.
+pub fn warning_summary(warnings: &[String]) -> String {
+    let mut counts = std::collections::BTreeMap::<&str, usize>::new();
+    for warning in warnings {
+        let category = if warning.contains("Property not mapped") {
+            "Unmapped properties"
+        } else if warning.contains("Reader status") {
+            "Partially decoded or unsupported records"
+        } else if warning.contains("Interpolation") || warning.contains("temporal ease") {
+            "Animation interpolation warnings"
+        } else if warning.contains("missing") || warning.contains("Footage placeholder") {
+            "Media/source warnings"
+        } else {
+            "Other compatibility warnings"
+        };
+        *counts.entry(category).or_default() += 1;
+    }
+    let rows: Vec<_> = counts.into_iter().map(|(name, count)| format!("{name}: {count}")).collect();
+    format!(
+        "{} diagnostic(s).\n{}\n\nExpand Technical details to inspect every warning. Unsupported data requires the original source; visual equivalence is unverified.",
+        warnings.len(),
+        rows.join("\n")
+    )
 }

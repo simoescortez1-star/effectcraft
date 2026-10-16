@@ -34,6 +34,12 @@ impl Dependencies<'_> {
     }
 
     fn group(&mut self, ctx: &EvalCtx, layer: &Layer, g: &PropGroup, depth: usize) -> Option<()> {
+        // Experimental external native effects can fail/restart or be disabled
+        // without document edits. Never persist their fallback pixels as a valid
+        // frame (including through selected-layer dependencies).
+        if matches!(&g.kind,effectcraft_project::GroupKind::Effect{effect} if effect.starts_with("org.effectcraft.aex.")) {
+            return None;
+        }
         if depth >= 32 {
             return None;
         }

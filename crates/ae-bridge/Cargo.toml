@@ -1,6 +1,6 @@
 [package]
 name = "effectcraft-ae-bridge"
-description = "Bounded external After Effects conversion and passive native-plugin inspection"
+description = "Bounded external After Effects conversion, passive inspection and optional native-worker effects"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,3 +12,4 @@ workspace = true
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
+effectcraft-effects = { workspace = true }
