@@ -6,17 +6,17 @@
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=../../assets/app-icon/effectcraft.ico");
+    println!("cargo:rerun-if-changed=../../assets/cortezeffects/cortezeffects.ico");
     println!("cargo:rerun-if-env-changed=EFFECTCRAFT_REQUIRE_WINRES");
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
         return;
     }
     let mut res = winresource::WindowsResource::new();
-    res.set_icon("../../assets/app-icon/effectcraft.ico")
-        .set("ProductName", "EffectCraft")
-        .set("FileDescription", "EffectCraft motion graphics and visual effects")
+    res.set_icon("../../assets/cortezeffects/cortezeffects.ico")
+        .set("ProductName", "CortezEffects")
+        .set("FileDescription", "CortezEffects motion graphics and visual effects")
         .set("LegalCopyright", "Copyright (c) 2026 The EffectCraft contributors. MIT OR Apache-2.0.")
-        .set("OriginalFilename", "effectcraft.exe")
+        .set("OriginalFilename", "CortezEffects.exe")
         .set("InternalName", "effectcraft");
     if let Err(e) = res.compile() {
         if std::env::var_os("EFFECTCRAFT_REQUIRE_WINRES").is_some() {

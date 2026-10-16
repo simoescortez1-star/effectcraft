@@ -105,7 +105,7 @@ fn ctrl_c_and_ctrl_v_copy_and_paste_keys_at_the_current_time() {
             _ => None,
         })
         .collect();
-    assert_eq!(copied, ["EffectCraft: 1 keyframe"], "the system clipboard is filled, so Ctrl+V sends a paste event");
+    assert_eq!(copied, ["CortezEffects: 1 keyframe"], "the system clipboard is filled, so Ctrl+V sends a paste event");
     assert!(h.state().session.state.clip_is_keys);
     // Move to 3 s, Ctrl+V: the key lands there.
     h.state_mut().session.set_time(effectcraft_engine::time::Tick::from_seconds_f64(3.0));

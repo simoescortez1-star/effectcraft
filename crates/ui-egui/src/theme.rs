@@ -1,10 +1,19 @@
 //! Design tokens. Every widget reads colours/sizes from [`Tokens`] so themes apply everywhere.
 //!
-//! The default theme follows the look of After Effects' dark UI (values estimated from public
-//! documentation and product knowledge, tuned by eye; see `plan/aftereffects/README.md` §2). Fonts
-//! are Inter + JetBrains Mono (OFL).
+//! CortezEffects extends the existing tokens with portable glass surfaces and five palettes.
+//! Legacy theme identifiers remain valid. Fonts are Inter + JetBrains Mono (OFL).
 
 use std::sync::Arc;
+thread_local! {
+    static TEXT_SCALE: std::cell::Cell<f32> = const { std::cell::Cell::new(1.0) };
+    static MONO_UI: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+fn scaled(size: f32) -> f32 {
+    size * TEXT_SCALE.with(std::cell::Cell::get)
+}
+fn ui_family() -> FontFamily {
+    if MONO_UI.with(std::cell::Cell::get) { FontFamily::Monospace } else { FontFamily::Proportional }
+}
 
 use egui::{Color32, FontData, FontDefinitions, FontFamily, FontId, Stroke, TextStyle, Visuals};
 use serde::{Deserialize, Serialize};
@@ -15,6 +24,8 @@ pub enum ThemeKind {
     Dark,
     Darker,
     Light,
+    Graphite,
+    Classic,
 }
 
 impl ThemeKind {
@@ -23,6 +34,8 @@ impl ThemeKind {
             "dark" | "default" => Some(ThemeKind::Dark),
             "darker" | "darkest" => Some(ThemeKind::Darker),
             "light" => Some(ThemeKind::Light),
+            "graphite" => Some(ThemeKind::Graphite),
+            "classic" => Some(ThemeKind::Classic),
             _ => None,
         }
     }
@@ -33,6 +46,8 @@ impl ThemeKind {
             ThemeKind::Dark => "dark",
             ThemeKind::Darker => "darker",
             ThemeKind::Light => "light",
+            ThemeKind::Graphite => "graphite",
+            ThemeKind::Classic => "classic",
         }
     }
 
@@ -105,6 +120,13 @@ pub struct Tokens {
     /// Settings ▸ Appearance ▸ Use Gradients: panel tab strips and buttons get a soft vertical
     /// gradient (off: flat fills).
     pub gradients: bool,
+    pub glass: bool,
+    pub reflections: f32,
+    pub glow: f32,
+    pub shadows: f32,
+    pub motion: f32,
+    pub text_scale: f32,
+    pub mono_ui: bool,
 }
 
 /// A vertical gradient fill (`top` → `bottom`) over `rect`.
@@ -182,9 +204,16 @@ impl Tokens {
             tab_h: 30.0,
             row_h: 19.0,
             gradients: true,
+            glass: true,
+            reflections: 0.30,
+            glow: 0.25,
+            shadows: 0.45,
+            motion: 0.16,
+            text_scale: 1.0,
+            mono_ui: false,
         };
-        match kind {
-            ThemeKind::Dark => dark,
+        let base = match kind {
+            ThemeKind::Dark | ThemeKind::Graphite | ThemeKind::Classic => dark,
             ThemeKind::Darker => Tokens {
                 app_bg: Color32::from_rgb(0x08, 0x08, 0x08),
                 header_bg: Color32::from_rgb(0x16, 0x16, 0x16),
@@ -236,20 +265,94 @@ impl Tokens {
                 expr_text: Color32::from_rgb(0xa3, 0x34, 0x17),
                 ..dark
             },
+        };
+        base.cortez_palette()
+    }
+
+    fn cortez_palette(mut self) -> Self {
+        if self.kind == ThemeKind::Classic {
+            self.glass = false;
+            self.gradients = false;
+            self.radius = 2.0;
+            self.radius_sm = 2.0;
+            self.reflections = 0.0;
+            self.glow = 0.0;
+            self.shadows = 0.0;
+            return self;
         }
+        let rgb = Color32::from_rgb;
+        let light = self.kind.is_light();
+        let midnight = self.kind == ThemeKind::Darker;
+        let graphite = self.kind == ThemeKind::Graphite;
+        self.app_bg = if light {
+            rgb(221, 226, 241)
+        } else if midnight {
+            rgb(10, 8, 24)
+        } else {
+            rgb(12, 15, 25)
+        };
+        self.header_bg = if light { rgb(242, 244, 251) } else { rgb(23, 26, 42) };
+        self.panel_bg = if light {
+            rgb(242, 245, 253)
+        } else if midnight {
+            rgb(27, 20, 47)
+        } else if graphite {
+            rgb(31, 33, 39)
+        } else {
+            rgb(24, 28, 43)
+        };
+        self.field_bg = if light { rgb(252, 253, 255) } else { rgb(15, 19, 31) };
+        self.field_border = if light { rgb(187, 194, 216) } else { rgb(61, 66, 90) };
+        self.separator = if light { rgb(207, 212, 230) } else { rgb(42, 47, 67) };
+        self.text = if light { rgb(34, 41, 64) } else { rgb(220, 225, 242) };
+        self.text_dim = if light { rgb(82, 91, 116) } else { rgb(156, 167, 196) };
+        self.text_faint = if light { rgb(89, 98, 122) } else { rgb(125, 139, 171) };
+        self.tab_text = self.text_dim;
+        self.tab_text_active = if light { rgb(25, 33, 55) } else { rgb(241, 242, 255) };
+        self.icon = self.text_dim;
+        self.icon_active = self.tab_text_active;
+        self.accent = if light { rgb(103, 75, 204) } else { rgb(155, 135, 255) };
+        self.accent_hover = self.accent.lerp_to_gamma(Color32::WHITE, 0.15);
+        self.focus = self.accent;
+        self.hot_text = self.accent;
+        self.cti = if light { rgb(26, 112, 168) } else { rgb(110, 211, 246) };
+        self.keyframe = if light { rgb(99, 87, 142) } else { rgb(184, 178, 221) };
+        self.keyframe_selected = self.accent;
+        self.timecode = self.cti;
+        self.row = self.panel_bg;
+        self.row_alt = self.panel_bg.lerp_to_gamma(if light { Color32::BLACK } else { Color32::WHITE }, 0.018);
+        self.hover = self.panel_bg.lerp_to_gamma(self.accent, 0.15);
+        self.pressed = self.panel_bg.lerp_to_gamma(self.accent, 0.27);
+        self.row_selected = self.pressed;
+        self.tl_bg = if light { rgb(228, 232, 245) } else { rgb(17, 21, 34) };
+        self.tl_ruler_bg = if light { rgb(235, 238, 250) } else { rgb(27, 31, 48) };
+        self.tl_ruler_tick = self.text_faint;
+        self.tl_ruler_text = self.text_dim;
+        self.tl_graph_selected = self.row_selected;
+        self.switch_well = self.field_bg;
+        self.tl_nav_bar = self.hover;
+        self.tl_work_area_bar = self.panel_bg.lerp_to_gamma(self.accent, 0.35);
+        self.fx_header = self.hover;
+        self.fx_header_active = self.pressed;
+        self.expr_bg = self.field_bg;
+        self.radius = 10.0;
+        self.radius_sm = 5.0;
+        // The pasteboard stays opaque. Glass is never composited over preview pixels.
+        self.pasteboard = if light { rgb(200, 207, 226) } else { rgb(11, 14, 23) };
+        self
     }
 
     pub fn mono(size: f32) -> FontId {
-        FontId::new(size, FontFamily::Monospace)
+        FontId::new(scaled(size), FontFamily::Monospace)
     }
     pub fn ui(size: f32) -> FontId {
-        FontId::new(size, FontFamily::Proportional)
+        FontId::new(scaled(size), ui_family())
     }
     pub fn semibold(size: f32) -> FontId {
-        FontId::new(size, FontFamily::Name("semibold".into()))
+        FontId::new(scaled(size), if MONO_UI.with(std::cell::Cell::get) { FontFamily::Monospace } else { FontFamily::Name("semibold".into()) })
     }
     pub fn medium(size: f32) -> FontId {
-        FontId::new(size, FontFamily::Name("medium".into()))
+        FontId::new(scaled(size), if MONO_UI.with(std::cell::Cell::get) { FontFamily::Monospace } else { FontFamily::Name("medium".into()) })
     }
     /// sRGB colour of an item/layer label (Settings ▸ Labels).
     pub fn label(&self, l: effectcraft_color::Label) -> Color32 {
@@ -266,7 +369,43 @@ impl Tokens {
             let [r, g, b] = p.label_rgb(*l);
             t.labels[i] = Color32::from_rgb(r, g, b);
         }
-        t.gradients = p.appearance.use_gradients;
+        let a = &p.appearance;
+        t.gradients &= a.use_gradients && !a.low_visual_power;
+        if let Some([r, g, b]) = crate::panels::viewer::hex_rgb(&a.accent_color) {
+            let c = Color32::from_rgb(r, g, b);
+            // Keep small numeric controls readable on the light surface, even with pale custom accents.
+            t.accent = if kind.is_light() && (r as u32 + g as u32 + b as u32) > 480 { c.lerp_to_gamma(Color32::BLACK, 0.35) } else { c };
+            t.accent_hover = t.accent.lerp_to_gamma(Color32::WHITE, 0.15);
+            t.focus = t.accent;
+            t.hot_text = t.accent;
+            t.keyframe_selected = t.accent;
+            t.row_selected = t.panel_bg.lerp_to_gamma(t.accent, 0.20);
+            t.fx_header_active = t.row_selected;
+            t.tl_graph_selected = t.row_selected;
+        }
+        let gray = |c: Color32| {
+            let y = ((c.r() as u32 + c.g() as u32 + c.b() as u32) / 3) as u8;
+            Color32::from_rgb(y, y, y).lerp_to_gamma(c, a.surface_saturation as f32)
+        };
+        t.panel_bg = gray(t.panel_bg);
+        t.header_bg = gray(t.header_bg);
+        t.glass &= !a.low_visual_power;
+        if t.glass {
+            let c = t.panel_bg;
+            t.panel_bg = Color32::from_rgba_unmultiplied(c.r(), c.g(), c.b(), (255.0 * a.panel_opacity) as u8);
+            t.radius = a.corner_radius as f32;
+            t.radius_sm = (t.radius * 0.5).min(8.0);
+            t.reflections = a.reflections as f32;
+            t.glow = a.glow as f32;
+            t.shadows = a.shadows as f32;
+        } else {
+            t.reflections = 0.0;
+            t.glow = 0.0;
+            t.shadows = 0.0;
+        }
+        t.motion = if a.reduce_motion || a.low_visual_power { 0.0 } else { 0.16 };
+        t.text_scale = a.text_scale as f32;
+        t.mono_ui = a.font_family == "mono";
         t
     }
 
@@ -470,10 +609,12 @@ pub fn theme_preference(appearance_mode: &str, light: bool) -> egui::ThemePrefer
 }
 
 pub fn apply_visuals(ctx: &egui::Context, t: &Tokens) {
+    TEXT_SCALE.with(|v| v.set(t.text_scale));
+    MONO_UI.with(|v| v.set(t.mono_ui));
     let light = t.kind.is_light();
     let mut v = if light { Visuals::light() } else { Visuals::dark() };
     v.panel_fill = t.panel_bg;
-    v.window_fill = t.panel_bg;
+    v.window_fill = t.panel_bg.to_opaque();
     v.extreme_bg_color = t.field_bg;
     v.faint_bg_color = t.row_alt;
     v.override_text_color = Some(t.text);
@@ -481,10 +622,10 @@ pub fn apply_visuals(ctx: &egui::Context, t: &Tokens) {
     v.selection.stroke = Stroke::new(1.0, Color32::WHITE);
     v.hyperlink_color = t.accent;
     v.window_stroke = Stroke::new(1.0, t.field_border);
-    v.window_corner_radius = egui::CornerRadius::same(8);
-    v.menu_corner_radius = egui::CornerRadius::same(6);
-    v.popup_shadow = egui::epaint::Shadow { offset: [0, 6], blur: 20, spread: 0, color: Color32::from_black_alpha(150) };
-    v.window_shadow = egui::epaint::Shadow { offset: [0, 10], blur: 36, spread: 0, color: Color32::from_black_alpha(170) };
+    v.window_corner_radius = egui::CornerRadius::same(t.radius as u8);
+    v.menu_corner_radius = egui::CornerRadius::same(t.radius_sm as u8);
+    v.popup_shadow = egui::epaint::Shadow { offset: [0, 6], blur: 20, spread: 0, color: Color32::from_black_alpha((200.0 * t.shadows) as u8) };
+    v.window_shadow = egui::epaint::Shadow { offset: [0, 10], blur: 36, spread: 0, color: Color32::from_black_alpha((230.0 * t.shadows) as u8) };
     for w in [&mut v.widgets.noninteractive, &mut v.widgets.inactive, &mut v.widgets.hovered, &mut v.widgets.active, &mut v.widgets.open] {
         w.corner_radius = egui::CornerRadius::same(t.radius_sm as u8);
     }
@@ -524,7 +665,13 @@ pub fn apply_visuals(ctx: &egui::Context, t: &Tokens) {
         s.text_styles.insert(TextStyle::Small, FontId::new(11.0, FontFamily::Proportional));
         s.text_styles.insert(TextStyle::Heading, FontId::new(15.0, FontFamily::Name("semibold".into())));
         s.text_styles.insert(TextStyle::Monospace, FontId::new(12.0, FontFamily::Monospace));
-        s.animation_time = 0.1;
+        for font in s.text_styles.values_mut() {
+            font.size *= t.text_scale;
+            if t.mono_ui {
+                font.family = FontFamily::Monospace;
+            }
+        }
+        s.animation_time = t.motion;
     });
 }
 

@@ -108,5 +108,15 @@ configuration from these Apache-2.0 projects:
 ## Modified edition branding
 
 The restricted ArtCraft brand images were removed under `docs/brand/LICENSE-brand.txt`.
-The header and About dialog reuse the existing open-licensed EffectCraft application icon,
-whose attribution and license remain in `assets/app-icon/`.
+Earlier compatibility editions reused the open-licensed EffectCraft application icon,
+whose attribution and license remain in `assets/app-icon/`. CortezEffects uses the new Ce marks below.
+
+## CortezEffects identity
+
+New Ce glass marks, AI-assisted original adaptation of the user-provided brand reference, contributed under MIT OR Apache-2.0:
+
+- `assets/cortezeffects/cortezeffects-1024.png` — CortezEffects contributor; MIT OR Apache-2.0; original work.
+- `assets/cortezeffects/cortezeffects-256.png` — CortezEffects contributor; MIT OR Apache-2.0; original work.
+- `assets/cortezeffects/cortezeffects-512.png` — CortezEffects contributor; MIT OR Apache-2.0; original work.
+- `assets/cortezeffects/cortezeffects.ico` — CortezEffects contributor; MIT OR Apache-2.0; original work.
+- `apps/effectcraft-web/web/cortezeffects.png` — CortezEffects contributor; MIT OR Apache-2.0; copy of the Ce application mark.

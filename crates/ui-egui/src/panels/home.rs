@@ -116,7 +116,7 @@ pub fn format_size(bytes: u64) -> String {
 /// The Kind column: what a recent file is, by its extension, in the interface language.
 fn kind_of(path: &str) -> &'static str {
     tr(match std::path::Path::new(path).extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref() {
-        Some("ecproj") => "EffectCraft project",
+        Some("ecproj") => "CortezEffects project",
         Some("aep" | "aepx") => "After Effects project",
         Some("json" | "lottie") => "Lottie animation",
         _ => "Project",
@@ -213,7 +213,7 @@ pub fn show(app: &mut EffectcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let t = app.tokens;
     let ctx = ui.ctx().clone();
     let p = ui.painter().with_clip_rect(rect);
-    p.rect_filled(rect, 0.0, t.app_bg);
+    crate::theme::gradient_rect(&p, rect, t.app_bg.lerp_to_gamma(t.accent, 0.09), t.app_bg);
     let mut actions: Vec<(&str, serde_json::Value)> = vec![];
     let rail = Rect::from_min_size(rect.min, vec2(RAIL_W.min(rect.width() * 0.4), rect.height()));
     p.rect_filled(rail, 0.0, t.panel_bg);
@@ -235,7 +235,9 @@ fn rail_ui(app: &mut EffectcraftApp, ui: &mut egui::Ui, p: &egui::Painter, rail:
     let t = app.tokens;
     let x0 = rail.min.x + 16.0;
     let w = rail.width() - 32.0;
-    let mut y = rail.min.y + 20.0;
+    crate::header::paint_logo(p, Rect::from_min_size(pos2(x0, rail.min.y + 22.0), vec2(44.0, 44.0)));
+    p.text(pos2(x0 + 52.0, rail.min.y + 44.0), Align2::LEFT_CENTER, "CortezEffects", Tokens::semibold(17.0), t.tab_text_active);
+    let mut y = rail.min.y + 86.0;
     for (label, id, primary) in [("New Project", "file.newProject", true), ("Open Project…", "file.open", false)] {
         let r = Rect::from_min_size(pos2(x0, y), vec2(w, 34.0));
         if widgets::text_button(ui, r, tr(label), primary, &t, egui::Id::new(("home", id))).clicked() {
@@ -243,6 +245,14 @@ fn rail_ui(app: &mut EffectcraftApp, ui: &mut egui::Ui, p: &egui::Painter, rail:
         }
         app.auto.add(&format!("home.{id}"), r, label);
         y += 42.0;
+    }
+    for (label, page) in [("Settings", "general"), ("Personalization", "appearance")] {
+        let r = Rect::from_min_size(pos2(x0, y), vec2(w, 30.0));
+        if widgets::text_button(ui, r, tr(label), false, &t, egui::Id::new(("home-settings", page))).clicked() {
+            super::settings::open(app, page);
+        }
+        app.auto.add(&format!("home.settings.{page}"), r, label);
+        y += 36.0;
     }
     y += 10.0;
     // Pages.
@@ -274,8 +284,8 @@ fn rail_ui(app: &mut EffectcraftApp, ui: &mut egui::Ui, p: &egui::Painter, rail:
     let links = [
         (Icon::Chat, "Join the ArtCraft Discord", "help.discord"),
         (Icon::Globe, "getartcraft.com", "help.website"),
-        (Icon::Globe, "EffectCraft home page", "help.appPage"),
-        (Icon::Code, "EffectCraft on GitHub", "help.github"),
+        (Icon::Globe, "CortezEffects home page", "help.appPage"),
+        (Icon::Code, "CortezEffects on GitHub", "help.github"),
     ];
     let sib = effectcraft_engine::links::SIBLINGS;
     let sib_rows = sib.len().div_ceil(2) as f32;
@@ -329,7 +339,7 @@ fn home_page(
     let t = app.tokens;
     let (x0, w) = (area.min.x, area.width());
     let mut y = area.min.y;
-    p.text(pos2(x0, y + 14.0), Align2::LEFT_CENTER, tr("Welcome to EffectCraft"), Tokens::semibold(26.0), t.tab_text_active);
+    p.text(pos2(x0, y + 14.0), Align2::LEFT_CENTER, tr("Welcome to CortezEffects"), Tokens::semibold(26.0), t.tab_text_active);
     y += 40.0;
     p.text(
         pos2(x0, y + 8.0),
@@ -532,7 +542,7 @@ mod tests {
         assert_eq!(format_ago(now, now - 30 * 86_400), "2026-08-22");
         assert_eq!(format_ago(now, now + 100), "Just now");
         assert_eq!((format_size(900), format_size(13_000), format_size(3_500_000)), ("900 B".into(), "13 KB".into(), "3.3 MB".into()));
-        assert_eq!((kind_of("/a/B.ecproj"), kind_of("c.AEP"), kind_of("x")), ("EffectCraft project", "After Effects project", "Project"));
+        assert_eq!((kind_of("/a/B.ecproj"), kind_of("c.AEP"), kind_of("x")), ("CortezEffects project", "After Effects project", "Project"));
     }
 
     /// The Home screen's own text goes through the interface catalog (#574): the Opened and Kind
@@ -545,7 +555,7 @@ mod tests {
         crate::i18n::set_current("zh-hant");
         let tw = (format_ago(now, now - 60), kind_of("x"));
         crate::i18n::set_current("en");
-        assert_eq!(zh, ("刚刚".into(), "3 小时前".into(), "昨天".into(), "EffectCraft 项目"));
+        assert_eq!(zh, ("刚刚".into(), "3 小时前".into(), "昨天".into(), "CortezEffects 项目"));
         assert_eq!(tw, ("1 分鐘前".into(), "專案"));
         assert_eq!(tr("Filter recent files"), "Filter recent files");
     }

@@ -456,7 +456,7 @@ fn run(cmd: &str, args: &Args, json_out: bool) -> Result<(), Failure> {
                 emit(&info, true);
             } else {
                 say!(
-                    "EffectCraft {} ({}), {} commands, {} effects",
+                    "CortezEffects {} ({}), {} commands, {} effects",
                     info["version"].as_str().unwrap_or(""),
                     info["mode"].as_str().unwrap_or(""),
                     info["commands"],

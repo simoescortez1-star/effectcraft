@@ -403,7 +403,7 @@ mod contrast_tests {
     /// brackets, line numbers) on its background; the switch icons show on their wells.
     #[test]
     fn custom_painted_surfaces_keep_text_readable_on_every_theme() {
-        for kind in [ThemeKind::Dark, ThemeKind::Darker, ThemeKind::Light] {
+        for kind in [ThemeKind::Dark, ThemeKind::Darker, ThemeKind::Light, ThemeKind::Graphite, ThemeKind::Classic] {
             let t = Tokens::for_kind(kind);
             let sx = Syntax::for_tokens(&t);
             for (what, bg) in [("effect header", t.fx_header), ("active effect header", t.fx_header_active)] {

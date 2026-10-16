@@ -15,10 +15,37 @@ use effectcraft_engine::commands::shape_tool::{PaintKind, ToolPaint};
 use effectcraft_engine::project::{LayerId, LayerSource, PropGroup};
 use effectcraft_engine::viewer as vw;
 
+/// Project identity and direct settings access alongside the existing menu bar. Window controls
+/// remain native, retaining Windows snapping, resizing and accessibility.
+pub(crate) fn project_bar(app: &mut EffectcraftApp, ui: &mut egui::Ui, rect: Rect) {
+    let t = app.tokens;
+    let gear = Rect::from_min_size(pos2(rect.right() - 30.0, rect.top()), vec2(26.0, 24.0));
+    let response = widgets::icon_button(ui, gear, Icon::Gear, false, &t, egui::Id::new("header-settings"));
+    app.auto.add_response("header.settings", &response, "Settings");
+    if response.on_hover_text(tr("Settings")).clicked() {
+        crate::panels::settings::open(app, "general");
+    }
+    let appearance = gear.translate(vec2(-30.0, 0.0));
+    let response = widgets::icon_button(ui, appearance, Icon::Sparkle, false, &t, egui::Id::new("header-personalization"));
+    app.auto.add_response("header.personalization", &response, "Appearance & Personalization");
+    if response.on_hover_text(tr("Appearance & Personalization")).clicked() {
+        crate::panels::settings::open(app, "appearance");
+    }
+    if rect.width() > 1180.0 {
+        let right = appearance.left() - 14.0;
+        let name = super::panels::unsaved::project_name(app);
+        let state = if app.session.is_dirty() { tr("Unsaved changes") } else { tr("Saved") };
+        let text = format!("{name}  ·  {state}");
+        let region = Rect::from_min_max(pos2(rect.left() + 580.0, rect.top()), pos2(right, rect.bottom()));
+        let p = ui.painter().with_clip_rect(region);
+        p.text(region.right_center(), Align2::RIGHT_CENTER, text, Tokens::ui(11.0), t.text_dim);
+    }
+}
+
 pub fn show(app: &mut EffectcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let t = app.tokens;
     let p = ui.painter().clone();
-    p.rect_filled(rect, 0.0, t.header_bg);
+    crate::theme::gradient_rect(&p, rect, t.grad_top(t.header_bg), t.header_bg);
     p.line_segment([rect.left_bottom(), rect.right_bottom()], Stroke::new(1.0, t.app_bg));
     let cy = rect.center().y;
     let mut x = rect.min.x + if app.integrated_titlebar && !app.ui.show_menu_bar { 80.0 } else { 10.0 };
@@ -27,9 +54,9 @@ pub fn show(app: &mut EffectcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let brand = Rect::from_min_size(pos2(x, cy - 12.0), vec2(24.0, 24.0));
     paint_logo(&p, brand);
     let bresp = ui.interact(brand, egui::Id::new("brand"), Sense::click());
-    app.auto.add_response("header.about", &bresp, "About EffectCraft");
+    app.auto.add_response("header.about", &bresp, "About CortezEffects");
     widgets::focus_outline(ui, &bresp, &t);
-    if bresp.on_hover_text(tr("About EffectCraft")).clicked() {
+    if bresp.on_hover_text(tr("About CortezEffects")).clicked() {
         app.dialog = Some(Dialog::About);
     }
     x += 32.0;
@@ -199,7 +226,7 @@ pub fn show(app: &mut EffectcraftApp, ui: &mut egui::Ui, rect: Rect) {
     }
     rx = discord.min.x - 6.0;
     for (id, icon, tip, cmd) in
-        [("hdr-github", Icon::Code, "EffectCraft on GitHub", "help.github"), ("hdr-web", Icon::Globe, "EffectCraft on getartcraft.com", "help.appPage")]
+        [("hdr-github", Icon::Code, "CortezEffects on GitHub", "help.github"), ("hdr-web", Icon::Globe, "CortezEffects on getartcraft.com", "help.appPage")]
     {
         let r = Rect::from_min_max(pos2(rx - 26.0, cy - 13.0), pos2(rx, cy + 13.0));
         if widgets::icon_button(ui, r, icon, false, &t, egui::Id::new(id)).on_hover_text(tip).clicked() {
@@ -654,10 +681,10 @@ fn ws_menu(app: &mut EffectcraftApp, ui: &mut egui::Ui) {
     }
 }
 
-/// This modified edition uses EffectCraft's open-licensed application icon.
-static EFFECTCRAFT_MARK: &[u8] = include_bytes!("../../../assets/app-icon/hicolor/256x256/apps/ai.storyteller.effectcraft.png");
+/// This modified edition uses CortezEffects's open-licensed application icon.
+static EFFECTCRAFT_MARK: &[u8] = include_bytes!("../../../assets/cortezeffects/cortezeffects-256.png");
 
-/// The EffectCraft application icon in `r` (decoded once into a mipmapped texture, so it stays crisp from the
+/// The CortezEffects application icon in `r` (decoded once into a mipmapped texture, so it stays crisp from the
 /// 24 px Tools bar to the About dialog). Nothing is drawn if it can't be decoded.
 pub fn paint_logo(p: &egui::Painter, r: Rect) {
     let ctx = p.ctx();

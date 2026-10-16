@@ -7,6 +7,10 @@ use egui::{Event, Key, Modifiers, PointerButton, Pos2, Rect, pos2, vec2};
 use egui_kittest::{Harness, kittest::Queryable as _};
 use serde_json::json;
 
+#[path = "support/settings.rs"]
+mod settings_support;
+use settings_support::scroll_to_setting;
+
 fn rect(h: &Harness<'_, EffectcraftApp>, id: &str) -> Rect {
     let e = h.state().auto.find(id).unwrap_or_else(|| panic!("missing {id}"));
     let r = Rect::from_min_size(pos2(e.rect[0], e.rect[1]), vec2(e.rect[2], e.rect[3]));
@@ -42,12 +46,14 @@ fn check_info_transaction(via_escape: bool) {
     let ctx = h.ctx.clone();
     menus::invoke(h.state_mut(), &ctx, "app.settings", json!({"page":"appearance"})).unwrap();
     h.run_steps(3);
+    scroll_to_setting(&mut h, "settings.appearance.brightness");
     let brightness = rect(&h, "settings.appearance.brightness");
     click(&mut h, brightness.center() + vec2(brightness.width() * 0.25, 0.0));
     let edited_brightness = h.state().session.prefs.appearance.brightness;
     assert!((edited_brightness - original_brightness).abs() > 0.01, "real brightness slider changed");
-    assert_eq!(saved(&store).prefs.appearance.brightness, original_brightness, "unconfirmed edit is not saved");
+    assert_eq!(saved(&store).prefs.appearance.brightness, edited_brightness, "personalization autosaves the live edit");
     // Type a UI Scale; keyboard zoom is deliberately disabled.
+    scroll_to_setting(&mut h, "settings.appearance.uiScale");
     let at = rect(&h, "settings.appearance.uiScale").center();
     click(&mut h, at);
     h.event(Event::Text("125".into()));
@@ -57,7 +63,7 @@ fn check_info_transaction(via_escape: bool) {
     }
     h.run_steps(2);
     assert_eq!(h.state().session.prefs.appearance.ui_scale, 125);
-    assert_eq!(saved(&store).prefs.appearance.ui_scale, 100, "unconfirmed scale edit is not saved");
+    assert_eq!(saved(&store).prefs.appearance.ui_scale, 125, "confirmed numeric input autosaves the scale edit");
     // Let UI Scale settle the centered dialog before reading its next hit target.
     h.run_steps(2);
     let at = rect(&h, "settings.page.previews").center();
@@ -67,7 +73,7 @@ fn check_info_transaction(via_escape: bool) {
     assert_eq!(h.state().dialog, Some(Dialog::Info), "real Settings button opened GPU Information");
     assert!(h.query_by_label("GPU Information").is_some(), "rendered GPU Information dialog");
     assert_eq!(h.state().session.prefs.appearance.ui_scale, 125);
-    assert_eq!(saved(&store).prefs.appearance.ui_scale, 100, "Info preserves the unconfirmed Settings transaction");
+    assert_eq!(saved(&store).prefs.appearance.ui_scale, 125, "Info preserves autosaved edits and the Cancel baseline");
     if via_escape {
         for pressed in [true, false] {
             h.event(Event::Key { key: Key::Escape, physical_key: Some(Key::Escape), pressed, repeat: false, modifiers: Modifiers::NONE });

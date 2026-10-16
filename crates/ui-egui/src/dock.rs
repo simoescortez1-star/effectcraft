@@ -1159,7 +1159,7 @@ pub fn draw_group_chrome(ui: &mut egui::Ui, g: &Group, t: &Tokens, reg: &mut cra
     }
     let mut out = Chrome::default();
     let painter = ui.painter().clone();
-    painter.rect_filled(g.rect, t.radius, t.panel_bg);
+    crate::glass::surface(&painter, g.rect, t);
     let active_panel = g.panels.get(g.active).copied();
     let compact = g.panels.len() == 1 && g.panels[0].compact();
     if compact {

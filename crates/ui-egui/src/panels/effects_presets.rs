@@ -1,6 +1,6 @@
 //! Effects & Presets: search (matches highlighted), the contents menu (colour-depth / GPU
 //! filters, animation presets on/off, categories or alphabetical, refresh), Favorites (star an
-//! effect), Recently Used, "* Animation Presets" (EffectCraft's own text animation and transition
+//! effect), Recently Used, "* Animation Presets" (CortezEffects's own text animation and transition
 //! presets and the user's `.ecpreset` files) and the effect categories. Double-click applies to the
 //! selected layers; dragging an effect onto a layer (timeline, viewer, Effect Controls) applies
 //! it there.

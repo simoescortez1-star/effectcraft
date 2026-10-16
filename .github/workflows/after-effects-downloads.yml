@@ -1,8 +1,8 @@
-name: Build downloadable EffectCraft Windows edition
+name: Build downloadable CortezEffects Windows edition
 
 on:
   push:
-    branches: [feat/after-effects-compatibility, feat/ae-advanced-compatibility]
+    branches: [feat/after-effects-compatibility, feat/ae-advanced-compatibility, feat/cortezeffects-liquid-glass]
   workflow_dispatch:
 
 permissions:
@@ -53,6 +53,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.99.0
         with:
           targets: x86_64-pc-windows-msvc
+      - name: Test CortezEffects personalization and window geometry on Windows
+        shell: pwsh
+        run: |
+          cargo +1.95.0 test --locked --release --target x86_64-pc-windows-msvc -p effectcraft-ui-egui --test ui_personalization --test ui_theme_favorites --test ui_panels --test ui_presets_folder --test ui_settings_info
+          if ($LASTEXITCODE -ne 0) { throw 'Personalization tests failed' }
+          cargo +1.95.0 test --locked --release --target x86_64-pc-windows-msvc -p effectcraft --bin effectcraft window::tests
+          if ($LASTEXITCODE -ne 0) { throw 'Window geometry tests failed' }
       - name: Build the pinned separate native ABI worker and original test plugin
         run: python packaging/after-effects/bootstrap_native_worker.py --work "$env:AEX_WORK"
       - name: Render real FFX and native AEX regression frames on Windows
@@ -66,7 +73,7 @@ jobs:
       - name: Upload downloadable packages
         uses: actions/upload-artifact@v4
         with:
-          name: effectcraft-windows-x64-${{ github.sha }}
+          name: CortezEffects-windows-x64-${{ github.sha }}
           path: dist/after-effects/*
           if-no-files-found: error
           compression-level: 0
@@ -74,14 +81,14 @@ jobs:
 
   release:
     needs: windows
-    if: github.repository == 'simoescortez1-star/effectcraft' && (github.ref == 'refs/heads/feat/after-effects-compatibility' || github.ref == 'refs/heads/feat/ae-advanced-compatibility')
+    if: github.repository == 'simoescortez1-star/effectcraft' && (github.ref == 'refs/heads/feat/after-effects-compatibility' || github.ref == 'refs/heads/feat/ae-advanced-compatibility' || github.ref == 'refs/heads/feat/cortezeffects-liquid-glass')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: effectcraft-windows-x64-${{ github.sha }}
+          name: CortezEffects-windows-x64-${{ github.sha }}
           path: packages
       - name: Publish a separate native Windows prerelease
         env:
@@ -91,8 +98,8 @@ jobs:
         run: |
           cd packages
           sha256sum --check SHA256SUMS.txt
-          gh release create "ae-native-${BUILD_SHA:0:12}" --target "$BUILD_SHA" \
-            --prerelease --title "EffectCraft Windows experimental ${BUILD_SHA:0:12}" \
+          gh release create "cortezeffects-glass-${BUILD_SHA:0:12}" --target "$BUILD_SHA" \
+            --prerelease --title "CortezEffects Liquid Glass experimental ${BUILD_SHA:0:12}" \
             --notes-file LEIA-ME.txt \
-            effectcraft-windows-x64-experimental.zip effectcraft-source.zip \
+            CortezEffects-Windows-x64.zip CortezEffects-source.zip \
             RELATORIO.md SAPPHIRE-S_SHAKE.md build.json CLI-SMOKE.txt SHA256SUMS.txt LEIA-ME.txt

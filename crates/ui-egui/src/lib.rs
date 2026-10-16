@@ -1,4 +1,4 @@
-//! The EffectCraft egui frontend (swappable): docking panels, the Composition viewer, the
+//! The CortezEffects egui frontend (swappable): docking panels, the Composition viewer, the
 //! Timeline with property twirl-downs and keyframes, Effect Controls, Effects & Presets, Preview,
 //! Info, Character/Paragraph/Align, menus, dialogs and the control channel.
 //!
@@ -18,6 +18,7 @@ mod dock_shared;
 pub mod dock_ui;
 mod expression_diagnostics;
 pub mod frames;
+mod glass;
 pub mod gpu_failure;
 pub mod header;
 pub mod i18n;
@@ -111,7 +112,7 @@ pub type SystemThemeFn = Box<dyn Fn(&egui::Context) -> Option<egui::Theme>>;
 pub enum FileDialog {
     /// Files to open or import with these extensions; several when `many`.
     Open { exts: Vec<String>, many: bool },
-    /// An EffectCraft project to open.
+    /// An CortezEffects project to open.
     OpenProject,
     /// A folder.
     Folder,
@@ -322,6 +323,7 @@ pub struct EffectcraftApp {
     pub(crate) pointer_comp: Option<[f32; 2]>,
     pub(crate) dialog_state: panels::dialogs::DialogState,
     pub integrated_titlebar: bool,
+    backdrop: glass::Backdrop,
     /// Audio preview while playing (audio clock drives playback).
     pub audio: Option<audio::AudioPlayback>,
     /// Audio scrubbing's open output (Ctrl/Cmd-drag the current time, `playback.scrubAudio`).
@@ -412,6 +414,7 @@ impl EffectcraftApp {
             pointer_comp: None,
             dialog_state: Default::default(),
             integrated_titlebar: false,
+            backdrop: glass::Backdrop::default(),
             audio: None,
             scrub: None,
             meter: Default::default(),
@@ -1679,18 +1682,31 @@ impl EffectcraftApp {
         if !ctx.input(|i| i.pointer.primary_down()) {
             self.ui.viewer.property_interacting = false;
         }
+        let adaptive = self.session.prefs.appearance.adaptive_effects && (self.playback.playing || self.session.render_job.is_some());
+        if adaptive {
+            self.tokens.glow = 0.0;
+            self.tokens.reflections = 0.0;
+            self.tokens.shadows = 0.0;
+        } else {
+            self.tokens = Tokens::from_prefs(&self.session.prefs, self.ui.theme);
+        }
         let t = self.tokens;
         let full = ui.max_rect();
         if self.dialog.is_some() {
             ui.disable();
         }
-        ui.painter().rect_filled(full, 0.0, t.app_bg);
+        let busy = self.playback.playing || self.session.render_job.is_some() || self.frames.inflight() > 0;
+        if let Some(error) = self.backdrop.paint(ui, full, &self.session.prefs.appearance, &t, busy) {
+            self.ui.status = error;
+        }
+
         let mut top = full.min.y;
         if self.ui.show_menu_bar {
             let mb = egui::Rect::from_min_size(full.min, egui::vec2(full.width(), 24.0));
             let mut child = ui.new_child(egui::UiBuilder::new().max_rect(mb));
             child.painter().rect_filled(mb, 0.0, t.header_bg);
             menus::menu_bar(self, &mut child);
+            header::project_bar(self, &mut child, mb);
             top = mb.max.y;
         }
         let header_h = 40.0;
@@ -1908,6 +1924,7 @@ impl eframe::App for EffectcraftApp {
         }
         self.init_gpu(frame);
         if !self.fonts_ready {
+            glass::splash(ui, &self.tokens);
             ui.ctx().request_repaint();
             return;
         }

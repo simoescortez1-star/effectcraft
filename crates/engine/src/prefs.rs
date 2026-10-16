@@ -46,13 +46,14 @@ pub const WINDOW_GRAPHICS: &[(&str, &str)] = &[("Automatic", "auto"), ("OpenGL (
 pub const APPEARANCE_MODES: &[(&str, &str)] = &[("Sync with System", "auto"), ("Dark", "dark"), ("Light", "light")];
 
 /// The dark family of themes: (label, `appearance.darkTheme` value).
-pub const DARK_THEMES: &[(&str, &str)] = &[("Dark", "dark"), ("Darker", "darker")];
+pub const DARK_THEMES: &[(&str, &str)] = &[("Liquid Glass Dark", "dark"), ("Midnight Purple", "darker"), ("Graphite", "graphite"), ("Classic", "classic")];
 
 /// The light family of themes: (label, `appearance.lightTheme` value).
-pub const LIGHT_THEMES: &[(&str, &str)] = &[("Light", "light")];
+pub const LIGHT_THEMES: &[(&str, &str)] = &[("Liquid Glass Light", "light")];
 
 /// Every theme (the legacy single-theme `appearance.theme`).
-pub const THEMES: &[(&str, &str)] = &[("Dark", "dark"), ("Darker", "darker"), ("Light", "light")];
+pub const THEMES: &[(&str, &str)] =
+    &[("Liquid Glass Dark", "dark"), ("Liquid Glass Light", "light"), ("Midnight Purple", "darker"), ("Graphite", "graphite"), ("Classic", "classic")];
 
 /// The settings whose value must be one of their choices.
 fn choices(key: &str) -> Option<&'static [(&'static str, &'static str)]> {
@@ -93,7 +94,7 @@ macro_rules! page {
 }
 
 page!(General {
-    /// Interface language: `system` (the operating system's, where EffectCraft has it, else
+    /// Interface language: `system` (the operating system's, where CortezEffects has it, else
     /// English), or a language code from `LANGUAGES`.
     language: String = "system".into(),
     /// Levels of Undo (1–99).
@@ -137,7 +138,7 @@ page!(AutoSave {
     enabled: bool = true,
     interval_minutes: u32 = 20,
     max_versions: u32 = 5,
-    /// `nextToProject` (an "EffectCraft Auto-Save" folder beside the project) or `custom`.
+    /// `nextToProject` (an "CortezEffects Auto-Save" folder beside the project) or `custom`.
     location: String = "nextToProject".into(),
     folder: String = String::new(),
     save_on_render_start: bool = false,
@@ -182,6 +183,25 @@ page!(Appearance {
     brightness: f64 = 0.0,
     /// The size of the whole interface in percent (75–200), on top of the display's own scale.
     ui_scale: u32 = 100,
+    /// CortezEffects additions are optional defaults; legacy paths and unknown fields survive.
+    accent_color: String = "#9b87ff".into(),
+    glass_blur: f64 = 12.0,
+    panel_opacity: f64 = 0.90,
+    glow: f64 = 0.25,
+    reflections: f64 = 0.30,
+    corner_radius: f64 = 10.0,
+    shadows: f64 = 0.45,
+    surface_saturation: f64 = 0.65,
+    wallpaper_path: String = String::new(),
+    wallpaper_opacity: f64 = 0.40,
+    wallpaper_blur: f64 = 8.0,
+    wallpaper_dim: f64 = 0.40,
+    wallpaper_fit: String = "cover".into(),
+    font_family: String = "inter".into(),
+    text_scale: f64 = 1.0,
+    reduce_motion: bool = false,
+    low_visual_power: bool = false,
+    adaptive_effects: bool = true,
     use_label_color_for_handles: bool = true,
     use_label_color_for_tabs: bool = true,
     cycle_mask_colors: bool = true,
@@ -634,6 +654,31 @@ impl Prefs {
         }
         self.appearance.brightness = self.appearance.brightness.clamp(-1.0, 1.0);
         self.appearance.ui_scale = self.appearance.ui_scale.clamp(75, 200);
+        let ap = &mut self.appearance;
+        if parse_hex(&ap.accent_color).is_none() {
+            ap.accent_color = "#9b87ff".into();
+        }
+        for (value, default, min, max) in [
+            (&mut ap.glass_blur, 12.0, 0.0, 24.0),
+            (&mut ap.panel_opacity, 0.90, 0.65, 1.0),
+            (&mut ap.glow, 0.25, 0.0, 1.0),
+            (&mut ap.reflections, 0.30, 0.0, 1.0),
+            (&mut ap.corner_radius, 10.0, 0.0, 18.0),
+            (&mut ap.shadows, 0.45, 0.0, 1.0),
+            (&mut ap.surface_saturation, 0.65, 0.0, 1.0),
+            (&mut ap.wallpaper_opacity, 0.40, 0.0, 1.0),
+            (&mut ap.wallpaper_blur, 8.0, 0.0, 24.0),
+            (&mut ap.wallpaper_dim, 0.40, 0.0, 1.0),
+            (&mut ap.text_scale, 1.0, 0.85, 1.5),
+        ] {
+            *value = if value.is_finite() { value.clamp(min, max) } else { default };
+        }
+        if !["cover", "contain", "stretch"].contains(&ap.wallpaper_fit.as_str()) {
+            ap.wallpaper_fit = "cover".into();
+        }
+        if !["inter", "mono"].contains(&ap.font_family.as_str()) {
+            ap.font_family = "inter".into();
+        }
         let defaults = default_labels();
         self.labels.truncate(defaults.len());
         for d in defaults.iter().skip(self.labels.len()) {
@@ -1154,7 +1199,7 @@ pub fn pages() -> Vec<Page> {
                 s("general.expressionPickWhipCompact", "Expression Pick Whip Writes Compact English", B, true),
                 s("general.createSplitLayersAbove", "Create Split Layers Above Original Layer", B, true),
                 s("general.useSystemColorPicker", "Use System Color Picker", B, false),
-                Note("EffectCraft always uses its own colour picker (the same on every platform and the web)."),
+                Note("CortezEffects always uses its own colour picker (the same on every platform and the web)."),
             ],
         },
         Page {
@@ -1166,7 +1211,7 @@ pub fn pages() -> Vec<Page> {
                 s("startup.offerCrashRecovery", "Offer to Open the Latest Auto-Save After a Crash", B, true),
                 s("startup.windowGraphics", "Window Graphics", Kind::Choice(WINDOW_GRAPHICS), true),
                 Note(
-                    "Window Graphics applies from the next launch. When the graphics driver stops EffectCraft as its window opens, the next launch switches to OpenGL.",
+                    "Window Graphics applies from the next launch. When the graphics driver stops CortezEffects as its window opens, the next launch switches to OpenGL.",
                 ),
                 Section("Repair"),
                 Button { label: "Reset Settings", command: "prefs.reset", params: "{}" },
@@ -1230,13 +1275,36 @@ pub fn pages() -> Vec<Page> {
         },
         Page {
             id: "appearance",
-            title: "Appearance",
+            title: "Appearance & Personalization",
             items: vec![
                 s("appearance.appearanceMode", "Appearance Mode", Kind::Choice(APPEARANCE_MODES), true),
                 s("appearance.lightTheme", "Light Theme", Kind::Choice(LIGHT_THEMES), true),
                 s("appearance.darkTheme", "Dark Theme", Kind::Choice(DARK_THEMES), true),
                 s("appearance.brightness", "Brightness", Kind::Slider(-1.0, 1.0), true),
                 s("appearance.uiScale", "UI Scale", Kind::Int(75, 200, "%"), true),
+                Section("Accent Color"),
+                s("appearance.accentColor", "Custom Accent (hex)", Kind::Text, true),
+                Section("Glass Surfaces"),
+                s("appearance.glassBlur", "Glass Blur", Kind::Slider(0.0, 24.0), true),
+                s("appearance.panelOpacity", "Panel Opacity", Kind::Slider(0.65, 1.0), true),
+                s("appearance.glow", "Glow", Kind::Slider(0.0, 1.0), true),
+                s("appearance.reflections", "Reflections", Kind::Slider(0.0, 1.0), true),
+                s("appearance.cornerRadius", "Corner Radius", Kind::Slider(0.0, 18.0), true),
+                s("appearance.shadows", "Shadows", Kind::Slider(0.0, 1.0), true),
+                s("appearance.surfaceSaturation", "Surface Saturation", Kind::Slider(0.0, 1.0), true),
+                Section("Wallpaper"),
+                s("appearance.wallpaperPath", "Wallpaper Image", Kind::Path, true),
+                s("appearance.wallpaperOpacity", "Wallpaper Opacity", Kind::Slider(0.0, 1.0), true),
+                s("appearance.wallpaperBlur", "Wallpaper Blur", Kind::Slider(0.0, 24.0), true),
+                s("appearance.wallpaperDim", "Wallpaper Dimming", Kind::Slider(0.0, 1.0), true),
+                s("appearance.wallpaperFit", "Wallpaper Framing", Kind::Choice(&[("Fill", "cover"), ("Fit", "contain"), ("Stretch", "stretch")]), true),
+                Section("Typography & Motion"),
+                s("appearance.fontFamily", "Interface Font", Kind::Choice(&[("Inter", "inter"), ("JetBrains Mono", "mono")]), true),
+                s("appearance.textScale", "Text Scale", Kind::Slider(0.85, 1.5), true),
+                s("appearance.reduceMotion", "Reduce Motion", B, true),
+                s("appearance.lowVisualPower", "Low Visual Power", B, true),
+                s("appearance.adaptiveEffects", "Reduce Effects During Playback and Rendering", B, true),
+                Button { label: "Restore Appearance Defaults", command: "prefs.reset", params: "{\"page\":\"appearance\"}" },
                 Section("Labels and Colors"),
                 s("appearance.useLabelColorForHandles", "Use Label Color for Layer Handles and Paths", B, true),
                 s("appearance.useLabelColorForTabs", "Use Label Color for Related Tabs", B, true),

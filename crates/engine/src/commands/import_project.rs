@@ -1,4 +1,4 @@
-//! File ▸ Import ▸ EffectCraft Project: merge another `.ecproj` (or its XML copy) into the
+//! File ▸ Import ▸ CortezEffects Project: merge another `.ecproj` (or its XML copy) into the
 //! current project, as After Effects imports an `.aep` into the open project. The imported
 //! items land in a folder named after the file; every id is shifted past the current project's
 //! so nothing collides, and the whole import is one undo step.
@@ -12,7 +12,7 @@ use crate::{EngineError, Result, Session, cmd};
 
 const C: &str = "file.importProject";
 
-/// Whether `path` names a project EffectCraft imports as a project (not as footage).
+/// Whether `path` names a project CortezEffects imports as a project (not as footage).
 pub(crate) fn is_project_path(path: &str) -> bool {
     let lower = path.to_ascii_lowercase();
     lower.ends_with(".ecproj") || lower.ends_with(".ecprojx") || lower.ends_with(".aep") || lower.ends_with(".aepx")
@@ -25,7 +25,7 @@ fn read_project(s: &Session, path: &str) -> Result<(Project, Option<String>, Opt
     }
     if path.to_ascii_lowercase().ends_with(".aep") {
         let converter = s.ae_converter.as_ref().ok_or_else(|| bad(C,
-            "AEP import requires an external converter. Build the pinned aep-reader adapter (docs/after-effects-compatibility.md) and set EFFECTCRAFT_AEP_CONVERTER to its absolute executable path before starting EffectCraft"))?;
+            "AEP import requires an external converter. Build the pinned aep-reader adapter (docs/after-effects-compatibility.md) and set EFFECTCRAFT_AEP_CONVERTER to its absolute executable path before starting CortezEffects"))?;
         let bytes = s.services.read_file_bounded(path, effectcraft_ae_bridge::MAX_SOURCE_BYTES).map_err(|e| bad(C, format!("cannot read {path}: {e}")))?;
         let converted = converter.convert(&bytes).map_err(|e| bad(C, e))?;
         if converted.project_json.len() > effectcraft_ae_bridge::MAX_PROJECT_BYTES {
@@ -38,7 +38,7 @@ fn read_project(s: &Session, path: &str) -> Result<(Project, Option<String>, Opt
         object.insert("originalSource".into(), json!(path));
         if let Some(warnings) = report.get_mut("report").and_then(|r| r.get_mut("warnings")).and_then(Value::as_array_mut) {
             for repair in repairs {
-                warnings.push(json!({"context": "EffectCraft validation", "message": repair}));
+                warnings.push(json!({"context": "CortezEffects validation", "message": repair}));
             }
         }
         let report = serde_json::to_string(&report).map_err(|e| bad(C, e.to_string()))?;
@@ -60,7 +60,7 @@ fn read_project(s: &Session, path: &str) -> Result<(Project, Option<String>, Opt
     let bytes = s.services.read_file(path).map_err(|e| EngineError::Other(format!("cannot read {path}: {e}")))?;
     let text = String::from_utf8(bytes).map_err(|_| bad(C, format!("{path} is not a text project file")))?;
     let text = if crate::xml_project::is_xml(&text) { crate::xml_project::from_xml(&text).map_err(EngineError::Other)? } else { text };
-    let project = Project::from_json(&text).map_err(|e| bad(C, format!("{path} is not a project EffectCraft can open: {e}")))?;
+    let project = Project::from_json(&text).map_err(|e| bad(C, format!("{path} is not a project CortezEffects can open: {e}")))?;
     Ok((project, effectcraft_project::saved_by(&text), None))
 }
 
@@ -167,7 +167,7 @@ fn import_project(s: &mut Session, p: &Value) -> Result<Value> {
         .collect();
     let primary = if let [one] = roots.as_slice() { Some(one.0) } else { None };
     if let Some(v) = saved_by.as_deref().filter(|v| effectcraft_project::is_newer_version(v, effectcraft_project::APP_VERSION)) {
-        warnings.push(format!("saved by EffectCraft {v}, newer than this version ({})", effectcraft_project::APP_VERSION));
+        warnings.push(format!("saved by CortezEffects {v}, newer than this version ({})", effectcraft_project::APP_VERSION));
     }
     if !missing.is_empty() {
         warnings.push(format!("{} footage file{} missing", missing.len(), if missing.len() == 1 { " is" } else { "s are" }));
@@ -216,7 +216,7 @@ pub fn specs() -> Vec<CommandSpec> {
         ),
         cmd!(
             "file.importProject",
-            "EffectCraft Project...",
+            "CortezEffects Project...",
             ["File", "Import"],
             None,
             "{path (.ecproj or .ecprojx)} — merges the project into a folder named after the file; returns {folder, items, comps, rootComps, primaryComp (the only root comp, else null), missingMedia, warnings}",

@@ -12,6 +12,10 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use serde_json::json;
 
+#[path = "support/settings.rs"]
+mod settings_support;
+use settings_support::scroll_to_setting;
+
 fn harness() -> Harness<'static, EffectcraftApp> {
     let mut s = Session::default();
     s.execute("comp.new", json!({"name": "Panels", "width": 320, "height": 180, "duration": 4})).unwrap();
@@ -263,6 +267,7 @@ fn scale(h: &Harness<'_, EffectcraftApp>) -> (u32, f32) {
 /// the keyboard) until Enter.
 fn type_scale(h: &mut Harness<'_, EffectcraftApp>, text: &str) {
     let before = scale(h);
+    scroll_to_setting(h, "settings.appearance.uiScale");
     click(h, "settings.appearance.uiScale");
     for c in text.chars() {
         h.input_mut().events.push(Event::Text(c.to_string()));
@@ -351,17 +356,7 @@ fn settings_buttons_stay_in_view_at_200_percent() {
             r
         })
     };
-    let scroll_page = |h: &mut Harness<'_, EffectcraftApp>| {
-        let at = rect(h, "settings.appearance.appearanceMode").center();
-        h.input_mut().events.push(Event::PointerMoved(at));
-        h.input_mut().events.push(Event::MouseWheel {
-            unit: egui::MouseWheelUnit::Point,
-            delta: egui::vec2(0.0, -1000.0),
-            modifiers: Default::default(),
-            phase: egui::TouchPhase::Move,
-        });
-        h.run_steps(5);
-    };
+    let scroll_page = |h: &mut Harness<'_, EffectcraftApp>| scroll_to_setting(h, "settings.appearance.uiScale");
     open_settings(&mut h);
     let footer = buttons(&h);
     let field = rect(&h, "settings.appearance.uiScale");
@@ -557,4 +552,21 @@ fn transition_presets_apply_from_effects_and_presets() {
     let fx = comp.layers[0].effects().unwrap().groups().next().expect("an effect was added").clone();
     assert_eq!(fx.name, "Radial Wipe");
     assert_eq!(fx.prop("completion").unwrap().keys.len(), 2);
+}
+
+#[test]
+fn appearance_sliders_reset_their_own_defaults() {
+    let mut h = harness();
+    for (key, value) in [("glassBlur", json!(23.0)), ("panelOpacity", json!(0.65)), ("textScale", json!(1.2))] {
+        h.state_mut().set_pref(&format!("appearance.{key}"), value).unwrap();
+    }
+    h.run_steps(3);
+    open_settings(&mut h);
+    for (key, expected) in [("glassBlur", json!(12.0)), ("panelOpacity", json!(0.9)), ("textScale", json!(1.0))] {
+        let id = format!("settings.appearance.{key}.default");
+        scroll_to_setting(&mut h, &id);
+        click(&mut h, &id);
+        h.run_steps(3);
+        assert_eq!(h.state().session.prefs.get(&format!("appearance.{key}")), Some(expected), "{key}");
+    }
 }

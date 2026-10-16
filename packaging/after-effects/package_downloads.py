@@ -64,7 +64,7 @@ def main():
     converter_root = converter_work / "aep-reader"
     converter_manifest = converter_root / "examples/effectcraft/Cargo.toml"
     bins = options.editor_bin or root / "target" / options.target / "release"
-    executable_paths = {name: bins / name for name in ["effectcraft.exe", "effectcraft-cli.exe", "effectcraft-aex-diagnostic.exe"]}
+    executable_paths = {"CortezEffects.exe": bins / "effectcraft.exe", **{name: bins / name for name in ["effectcraft-cli.exe", "effectcraft-aex-diagnostic.exe"]}}
     executable_paths["aep-effectcraft.exe"] = converter_work / "target" / options.target / "release/aep-effectcraft.exe"
     native_work = options.native_work.resolve()
     native_bins = native_work / "target" / options.target / "release"
@@ -105,7 +105,14 @@ def main():
         if validation.get("source_commit") != sha or not all(validation.get(test) is True for test in ["ffx_external_generated_end_to_end", "ffx_direct_transform_presets_render_and_preserve_saved_timebase", "aex_native_worker_renders_and_recovers_after_child_exit", "aex_local_diagnostic"]):
             raise ValueError("required Windows render validation is missing or belongs to another source commit")
         subprocess.run(["git", "merge-base", "--is-ancestor", COMPATIBILITY, sha], cwd=root, check=True)
-        build = {"source_commit": sha, "preserved_compatibility_commit": COMPATIBILITY, "target": options.target,
+        version_info = {}
+        if not options.skip_native_smoke:
+            editor_literal = str(executable_paths["CortezEffects.exe"].resolve()).replace("'", "''")
+            ps = f"$v=(Get-Item -LiteralPath '{editor_literal}').VersionInfo; @{{product=$v.ProductName; description=$v.FileDescription; originalFilename=$v.OriginalFilename}} | ConvertTo-Json -Compress"
+            version_info = json.loads(command(root, "powershell", "-NoProfile", "-NonInteractive", "-Command", ps))
+            if version_info.get("product") != "CortezEffects" or version_info.get("originalFilename") != "CortezEffects.exe":
+                raise ValueError("Windows executable resources do not carry the CortezEffects identity")
+        build = {"product": "CortezEffects", "windows_version_info": version_info, "source_commit": sha, "preserved_compatibility_commit": COMPATIBILITY, "target": options.target,
                  "rust": command(root, "rustc", "+1.95.0", "--version"), "native_cli_smoke_passed": not options.skip_native_smoke,
                  "windows_11_gui_tested": False, "ffx_supported": "partial-mapped-properties", "aepx_supported": False, "aex_runtime_supported": "experimental-cpu-smart-render-float-sliders",
                  "native_validation": validation,
@@ -114,8 +121,17 @@ def main():
         (out / "CLI-SMOKE.txt").write_text(smoke + "\n", encoding="utf-8")
         sapphire_report = (root / "packaging/after-effects/RELATORIO-S_Shake.md").read_bytes()
         (out / "SAPPHIRE-S_SHAKE.md").write_bytes(sapphire_report)
-        (out / "RELATORIO.md").write_bytes(sapphire_report + "\n\n---\n\n# Histórico: relatório da etapa anterior (83dcf7c7)\n\nOs resultados da etapa S_Shake acima são os atuais; o registro anterior abaixo documenta o trabalho preservado.\n\n".encode("utf-8") + (root / "packaging/after-effects/RELATORIO-avancado.md").read_bytes())
-        readme = """EFFECTCRAFT - EDICAO EXPERIMENTAL E PARCIAL
+        delivery = (f"\n\n## Identificação da compilação Windows\n\nCommit: `{sha}`. Alvo: `{options.target}`.\n\n"
+                    f"Destino de publicação configurado no workflow: https://github.com/simoescortez1-star/effectcraft/releases/tag/cortezeffects-glass-{sha[:12]}\n\n"
+                    "O endereço é publicado após o sucesso do pacote e sua disponibilidade é verificada na entrega.\n\n"
+                    f"Validação automatizada desta compilação:\n\n```json\n{json.dumps(validation, indent=2)}\n```\n"
+                    "\nWindows 11 com interação manual: não testado. Sapphire comercial: compatibilidade não comprovada.\n")
+        (out / "RELATORIO.md").write_bytes((root / "docs/cortezeffects-redesign.md").read_bytes() + delivery.encode("utf-8"))
+        readme = """CORTEZEFFECTS - LIQUID GLASS - EDICAO EXPERIMENTAL
+Abra CortezEffects.exe ou Launch.cmd. Interface: Aparencia e personalizacao pelo botao de brilho no topo.
+Cinco temas, cores de destaque, controles de vidro, wallpaper PNG/JPEG, fontes e movimento reduzido.
+As preferencias e projetos antigos sao mantidos; a pasta de dados continua EffectCraftData por compatibilidade.
+Vidro simulado com fundo desfocado em cache; nao utiliza Mica/Acrylic nem altera os pixels exportados.
 Descompacte o ZIP Windows completamente em uma pasta gravavel e abra Launch.cmd.
 Pacote portatil: nao requer MSI nem privilegios de administrador. Nao inclui plugins comerciais.
 AEP e FFX usam o conversor separado incluido. Suporte parcial; AEPX ainda indisponivel.
@@ -139,7 +155,7 @@ O funcionamento da interface e a fidelidade de renderizacao no Windows 11 ainda 
 Os executaveis experimentais nao possuem assinatura de codigo.
 """
         (out / "LEIA-ME.txt").write_text(readme, encoding="utf-8")
-        windows = out / "effectcraft-windows-x64-experimental.zip"
+        windows = out / "CortezEffects-Windows-x64.zip"
         with zipfile.ZipFile(windows, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as package:
             for name, path in executable_paths.items():
                 package.write(path, name)
@@ -159,7 +175,8 @@ Os executaveis experimentais nao possuem assinatura de codigo.
             package.write(options.validation / "WINDOWS-VALIDATION.json", "validation/WINDOWS-VALIDATION.json")
             for name in ["aex-local-diagnostic.json", "aex-crash-checkpoint.json"]:
                 package.write(options.validation / name, "validation/" + name)
-            package.write(root / "packaging/after-effects/RELATORIO-base-e30d8d6d.md", "RELATORIO-base-e30d8d6d.md")
+            for name in ["RELATORIO-base-e30d8d6d.md", "RELATORIO-avancado.md"]:
+                package.write(root / "packaging/after-effects" / name, name)
             for path in (root / "packaging/after-effects/native-notices").iterdir():
                 package.write(path, "native-worker-notices/" + path.name)
             # Ship the unmodified covered source for the MPL terminal-color crate.
@@ -174,11 +191,14 @@ Os executaveis experimentais nao possuem assinatura de codigo.
             package.writestr("native-worker-notices/colored-source.zip", source_zip.getvalue())
             package.write(root / "docs/after-effects-compatibility.md", "ARCHITECTURE-AND-COMPATIBILITY.md")
             package.write(root / "packaging/windows/portable.txt", "portable.txt")
-            package.writestr("Launch.cmd", '@echo off\r\nset "EFFECTCRAFT_AEP_CONVERTER=%~dp0aep-effectcraft.exe"\r\nset "EFFECTCRAFT_AEX_WORKER=%~dp0effectcraft-aex-worker.exe"\r\n"%~dp0effectcraft.exe" %*\r\n')
+            for path in (root / "assets/cortezeffects").iterdir():
+                if path.is_file():
+                    package.write(path, "asset-notices/cortezeffects/" + path.name)
+            package.writestr("Launch.cmd", '@echo off\r\nset "EFFECTCRAFT_AEP_CONVERTER=%~dp0aep-effectcraft.exe"\r\nset "EFFECTCRAFT_AEX_WORKER=%~dp0effectcraft-aex-worker.exe"\r\n"%~dp0CortezEffects.exe" %*\r\n')
             package.write(root / "packaging/after-effects/Diagnosticar-Sapphire.cmd", "Diagnosticar-Sapphire.cmd")
-        source = out / "effectcraft-source.zip"
+        source = out / "CortezEffects-source.zip"
         with source.open("wb") as file:
-            subprocess.run(["git", "archive", "--format=zip", "--prefix=effectcraft/", "HEAD"], cwd=root, stdout=file, check=True)
+            subprocess.run(["git", "archive", "--format=zip", "--prefix=CortezEffects/", "HEAD"], cwd=root, stdout=file, check=True)
         with tempfile.TemporaryDirectory(prefix="effectcraft-package-") as temp:
             bundle = Path(temp) / "effectcraft-changes.bundle"
             subprocess.run(["git", "bundle", "create", str(bundle), f"{BASE}..HEAD"], cwd=root, check=True)

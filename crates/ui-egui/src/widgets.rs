@@ -264,10 +264,14 @@ pub fn icon_toggle(ui: &mut Ui, rect: Rect, icon: Icon, on: bool, t: &Tokens, id
 /// Icon button (toolbar style) with optional active state.
 pub fn icon_button(ui: &mut Ui, rect: Rect, icon: Icon, active: bool, t: &Tokens, id: egui::Id) -> Response {
     let resp = ui.interact(rect, id, Sense::click());
+    let hover = ui.ctx().animate_bool_with_time_and_easing(id.with("glass-hover"), resp.hovered(), t.motion, egui::emath::easing::cubic_out);
     if active {
-        ui.painter().rect_filled(rect, 4.0, t.accent);
-    } else if resp.hovered() {
-        ui.painter().rect_filled(rect, 4.0, t.hover);
+        ui.painter().rect_filled(rect, t.radius_sm, t.accent);
+    } else if hover > 0.001 {
+        ui.painter().rect_filled(rect, t.radius_sm, t.hover.gamma_multiply(hover));
+        if t.glow > 0.0 {
+            ui.painter().rect_stroke(rect.shrink(0.5), t.radius_sm, Stroke::new(0.7, t.accent.gamma_multiply(hover * t.glow)), StrokeKind::Inside);
+        }
     }
     let col = if active {
         Color32::WHITE

@@ -29,6 +29,7 @@ enum Act {
     Set(String, Value),
     Run(String, Value),
     PickFolder(String),
+    PickWallpaper,
     PickProject(String),
     /// Install from File (a downloaded weights file) for a task's models.
     PickModel(Task),
@@ -52,6 +53,9 @@ fn reg(app: &mut EffectcraftApp, id: &str, r: &egui::Response, label: &str) {
 fn page_ui(app: &mut EffectcraftApp, ui: &mut egui::Ui, page: &Page, cur: &Value, t: &Tokens, acts: &mut Vec<Act>) {
     let get = |key: &str| cur.pointer(&format!("/{}", key.replace('.', "/"))).cloned().unwrap_or(Value::Null);
     let label_w = 250.0;
+    if page.id == "appearance" {
+        personalization_ui(app, ui, t, acts);
+    }
     for item in &page.items {
         match *item {
             Item::Section(title) => {
@@ -101,7 +105,7 @@ fn page_ui(app: &mut EffectcraftApp, ui: &mut egui::Ui, page: &Page, cur: &Value
             Item::Setting { key, label, kind, live } => {
                 let v = get(key);
                 let id = format!("settings.{key}");
-                let tip = (!live).then(|| tr("Stored, but not used by EffectCraft yet"));
+                let tip = (!live).then(|| tr("Stored, but not used by CortezEffects yet"));
                 let mut resp: Option<egui::Response> = None;
                 match kind {
                     Kind::Bool => {
@@ -143,11 +147,19 @@ fn page_ui(app: &mut EffectcraftApp, ui: &mut egui::Ui, page: &Page, cur: &Value
                                 }
                                 Kind::Slider(lo, hi) => {
                                     let mut x = v.as_f64().unwrap_or(0.0);
-                                    ui.label(RichText::new(tr("Darker")).color(t.text_dim));
-                                    let r = ui.add(egui::Slider::new(&mut x, lo..=hi).show_value(false));
-                                    ui.label(RichText::new(tr("Lighter")).color(t.text_dim));
-                                    if ui.small_button(tr("Default")).clicked() {
-                                        acts.push(Act::Set(key.into(), json!(0.0)));
+                                    let brightness = key == "appearance.brightness";
+                                    if brightness {
+                                        ui.label(RichText::new(tr("Darker")).color(t.text_dim));
+                                    }
+                                    let r = ui.add(egui::Slider::new(&mut x, lo..=hi).show_value(!brightness).max_decimals(2));
+                                    if brightness {
+                                        ui.label(RichText::new(tr("Lighter")).color(t.text_dim));
+                                    }
+                                    let reset = ui.small_button(tr("Default"));
+                                    reg(app, &format!("{id}.default"), &reset, "Default");
+                                    if reset.clicked() {
+                                        let default = effectcraft_engine::prefs::Prefs::default().get(key).unwrap_or(json!(0.0));
+                                        acts.push(Act::Set(key.into(), default));
                                     }
                                     if r.changed() {
                                         acts.push(Act::Set(key.into(), json!(x)));
@@ -170,16 +182,36 @@ fn page_ui(app: &mut EffectcraftApp, ui: &mut egui::Ui, page: &Page, cur: &Value
                                         .response
                                 }
                                 Kind::Text | Kind::Path => {
-                                    let mut s = v.as_str().unwrap_or("").to_string();
+                                    let draft_id = egui::Id::new(("settings-text-draft", key));
+                                    let accent = key == "appearance.accentColor";
+                                    let mut s = if accent {
+                                        ui.data(|d| d.get_temp::<String>(draft_id)).unwrap_or_else(|| v.as_str().unwrap_or("").to_string())
+                                    } else {
+                                        v.as_str().unwrap_or("").to_string()
+                                    };
                                     let r = ui.add(egui::TextEdit::singleline(&mut s).desired_width(if kind == Kind::Path { 230.0 } else { 260.0 }));
                                     if r.changed() {
-                                        acts.push(Act::Set(key.into(), json!(s)));
+                                        if accent {
+                                            ui.data_mut(|d| d.insert_temp(draft_id, s.clone()));
+                                        }
+                                        if !accent || crate::panels::viewer::hex_rgb(&s).is_some() {
+                                            acts.push(Act::Set(key.into(), json!(s)));
+                                        }
+                                    }
+                                    if accent && !r.has_focus() {
+                                        ui.data_mut(|d| d.remove::<String>(draft_id));
                                     }
                                     if kind == Kind::Path {
                                         let b = ui.button(tr("Choose..."));
                                         reg(app, &format!("{id}.choose"), &b, "Choose...");
                                         if b.clicked() {
-                                            acts.push(if key.ends_with("Path") { Act::PickProject(key.into()) } else { Act::PickFolder(key.into()) });
+                                            acts.push(if key == "appearance.wallpaperPath" {
+                                                Act::PickWallpaper
+                                            } else if key.ends_with("Path") {
+                                                Act::PickProject(key.into())
+                                            } else {
+                                                Act::PickFolder(key.into())
+                                            });
                                         }
                                     }
                                     r
@@ -214,7 +246,7 @@ fn page_ui(app: &mut EffectcraftApp, ui: &mut egui::Ui, page: &Page, cur: &Value
     }
 }
 
-/// A small EffectCraft window painted with theme `kind`'s tokens: the Tools bar, the Project
+/// A small CortezEffects window painted with theme `kind`'s tokens: the Tools bar, the Project
 /// panel, the Composition panel, the Preview and Properties column and the Timeline with its
 /// layer bars.
 fn theme_preview(ui: &mut egui::Ui, kind: ThemeKind, width: f32) {
@@ -662,10 +694,10 @@ pub fn show(app: &mut EffectcraftApp, ctx: &egui::Context, t: &Tokens) {
             let ui = &mut body;
             // Page list (left, like After Effects).
             ui.vertical(|ui| {
-                ui.set_width(180.0);
+                ui.set_width(190.0);
                 egui::ScrollArea::vertical().id_salt("settings-pages").max_height(body_h).auto_shrink([false, false]).show(ui, |ui| {
                     for p in &all {
-                        let (r, resp) = ui.allocate_exact_size(vec2(176.0, 24.0), egui::Sense::click());
+                        let (r, resp) = ui.allocate_exact_size(vec2(186.0, 24.0), egui::Sense::click());
                         let sel = page == p.id;
                         if sel {
                             ui.painter().rect_filled(r, 3.0, t.accent);
@@ -676,7 +708,7 @@ pub fn show(app: &mut EffectcraftApp, ctx: &egui::Context, t: &Tokens) {
                             r.left_center() + vec2(10.0, 0.0),
                             egui::Align2::LEFT_CENTER,
                             tr(p.title),
-                            Tokens::ui(12.5),
+                            Tokens::ui(if p.id == "appearance" { 9.5 } else { 12.5 }),
                             if sel { Color32::WHITE } else { t.text },
                         );
                         app.auto.add(&format!("settings.page.{}", p.id), r, p.title);
@@ -694,7 +726,7 @@ pub fn show(app: &mut EffectcraftApp, ctx: &egui::Context, t: &Tokens) {
                 let p = &all[idx];
                 ui.label(RichText::new(tr(p.title)).font(Tokens::semibold(14.0)).color(t.tab_text_active));
                 ui.add_space(6.0);
-                egui::ScrollArea::vertical().max_height((body_h - 30.0).max(0.0)).auto_shrink([false, false]).show(ui, |ui| {
+                egui::ScrollArea::vertical().id_salt(("settings-body", p.id)).max_height((body_h - 30.0).max(0.0)).auto_shrink([false, false]).show(ui, |ui| {
                     page_ui(app, ui, p, &cur, t, &mut acts);
                 });
             });
@@ -708,6 +740,7 @@ pub fn show(app: &mut EffectcraftApp, ctx: &egui::Context, t: &Tokens) {
                     app.ui.status = e;
                 }
                 app.session.prefs_changed();
+                app.session.save_prefs();
             }
             Act::Run(cmd, params) => {
                 if let Err(e) = crate::menus::invoke(app, ctx, &cmd, params) {
@@ -719,6 +752,13 @@ pub fn show(app: &mut EffectcraftApp, ctx: &egui::Context, t: &Tokens) {
                 }
                 if app.dialog != Some(Dialog::Settings) && app.dialog != Some(Dialog::Info) {
                     app.dialog = Some(Dialog::Settings);
+                }
+            }
+            Act::PickWallpaper => {
+                if let Some(path) = app.hooks.pick_files.as_ref().and_then(|f| f(&["png", "jpg", "jpeg"]).into_iter().next())
+                    && let Err(error) = app.set_pref("appearance.wallpaperPath", json!(path))
+                {
+                    app.ui.status = error;
                 }
             }
             Act::PickFolder(k) => {
@@ -751,6 +791,7 @@ pub fn show(app: &mut EffectcraftApp, ctx: &egui::Context, t: &Tokens) {
         if let Some(p) = app.dialog_state.prefs_snapshot.take() {
             app.session.prefs = p;
             app.session.prefs_changed();
+            app.session.save_prefs();
         }
         app.dialog = None;
     } else if ok {
@@ -768,7 +809,7 @@ pub fn recovery(app: &mut EffectcraftApp, ctx: &egui::Context, t: &Tokens) {
     };
     let mut choice: Option<&str> = None;
     super::dialogs::modal(ctx, "Recover Project", vec2(560.0, 230.0), t, |ui| {
-        ui.label(tr("EffectCraft didn't quit normally last time."));
+        ui.label(tr("CortezEffects didn't quit normally last time."));
         ui.add_space(6.0);
         if let Some(p) = &r.project {
             ui.label(tr_args("Project: {}", &[&p]));
@@ -826,4 +867,44 @@ pub fn recovery(app: &mut EffectcraftApp, ctx: &egui::Context, t: &Tokens) {
     {
         app.ui.status = e;
     }
+}
+
+fn personalization_ui(app: &mut EffectcraftApp, ui: &mut egui::Ui, t: &Tokens, acts: &mut Vec<Act>) {
+    ui.horizontal(|ui| {
+        let (r, _) = ui.allocate_exact_size(vec2(42.0, 42.0), egui::Sense::hover());
+        crate::header::paint_logo(ui.painter(), r);
+        ui.vertical(|ui| {
+            ui.label(RichText::new(tr("CortezEffects")).font(Tokens::semibold(18.0)).color(t.tab_text_active));
+            ui.label(tr("Make this workspace yours."));
+        });
+    });
+    ui.add_space(10.0);
+    ui.horizontal_wrapped(|ui| {
+        for (label, hex) in [("Purple", "#9b87ff"), ("Blue", "#5b9dff"), ("Pink", "#f08abc"), ("Cyan", "#60d8ed"), ("Red", "#ed707d"), ("Green", "#65d6a1")] {
+            let rgb = crate::panels::viewer::hex_rgb(hex).unwrap_or([155, 135, 255]);
+            let (rect, response) = ui.allocate_exact_size(vec2(26.0, 26.0), egui::Sense::click());
+            ui.painter().circle_filled(rect.center(), 9.0, Color32::from_rgb(rgb[0], rgb[1], rgb[2]));
+            if app.session.prefs.appearance.accent_color == hex {
+                ui.painter().circle_stroke(rect.center(), 12.0, egui::Stroke::new(1.0, t.text));
+            }
+            reg(app, &format!("settings.appearance.accent.{label}"), &response, label);
+            if response.on_hover_text(tr(label)).clicked() {
+                acts.push(Act::Set("appearance.accentColor".into(), json!(hex)));
+            }
+        }
+    });
+    ui.horizontal(|ui| {
+        let r = ui.button(tr("Choose Wallpaper…"));
+        reg(app, "settings.appearance.chooseWallpaper", &r, "Choose Wallpaper…");
+        if r.clicked() {
+            acts.push(Act::PickWallpaper);
+        }
+        let r = ui.button(tr("Remove Wallpaper"));
+        reg(app, "settings.appearance.removeWallpaper", &r, "Remove Wallpaper");
+        if r.clicked() {
+            acts.push(Act::Set("appearance.wallpaperPath".into(), json!("")));
+        }
+    });
+    ui.label(RichText::new(tr("Personalization is saved automatically. Cancel restores previous settings.")).small().color(t.text_dim));
+    ui.separator();
 }
