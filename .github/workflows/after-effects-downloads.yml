@@ -1,0 +1,87 @@
+name: Build downloadable EffectCraft Windows edition
+
+on:
+  push:
+    branches: [feat/after-effects-compatibility]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: after-effects-downloads-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: 3
+      CARGO_PROFILE_RELEASE_LTO: "off"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "16"
+      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS: -C target-feature=+crt-static
+      AEP_WORK: ${{ github.workspace }}/../effectcraft-aep-converter
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+      - name: Check formatting
+        run: cargo fmt --check
+      - name: Build editor and CLI with static CRT
+        env:
+          EFFECTCRAFT_REQUIRE_WINRES: "1"
+        run: cargo build --locked --release --target x86_64-pc-windows-msvc -p effectcraft -p effectcraft-cli
+      - name: Test the bridge and engine integration on Windows
+        shell: pwsh
+        run: |
+          cargo test --locked --release --target x86_64-pc-windows-msvc -p effectcraft-ae-bridge
+          if ($LASTEXITCODE -ne 0) { throw 'Bridge tests failed' }
+          cargo test --locked --release --target x86_64-pc-windows-msvc -p effectcraft-engine --lib after_effects
+          if ($LASTEXITCODE -ne 0) { throw 'Engine integration tests failed' }
+      - name: Build and test the pinned separate converter
+        run: python packaging/after-effects/bootstrap_converter.py --work "$env:AEP_WORK" --lock-file packaging/after-effects/converter-Cargo.lock --target x86_64-pc-windows-msvc --release
+      - name: Retrieve the verified license notices from the original distribution
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download ae-compat-e30d8d6d --repo simoescortez1-star/effectcraft --pattern effectcraft-windows-x64-experimental.zip --dir "$env:RUNNER_TEMP/notice-input"
+      - name: Smoke-test CLI and create Windows/source ZIPs
+        run: python packaging/after-effects/package_downloads.py --converter-work "$env:AEP_WORK" --notice-package "$env:RUNNER_TEMP/notice-input/effectcraft-windows-x64-experimental.zip" --out dist/after-effects
+      - name: Upload downloadable packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: effectcraft-windows-x64-${{ github.sha }}
+          path: dist/after-effects/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
+
+  release:
+    needs: windows
+    if: github.repository == 'simoescortez1-star/effectcraft' && github.ref == 'refs/heads/feat/after-effects-compatibility'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: effectcraft-windows-x64-${{ github.sha }}
+          path: packages
+      - name: Publish a separate native Windows prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BUILD_SHA: ${{ github.sha }}
+        run: |
+          cd packages
+          sha256sum --check SHA256SUMS.txt
+          gh release create "ae-native-${BUILD_SHA:0:12}" --target "$BUILD_SHA" \
+            --prerelease --title "EffectCraft Windows experimental ${BUILD_SHA:0:12}" \
+            --notes-file LEIA-ME.txt \
+            effectcraft-windows-x64-experimental.zip effectcraft-source.zip \
+            RELATORIO.md build.json CLI-SMOKE.txt SHA256SUMS.txt LEIA-ME.txt

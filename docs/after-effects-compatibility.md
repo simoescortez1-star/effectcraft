@@ -26,6 +26,29 @@ There is no claim of commercial-plugin compatibility or AE-equivalent visual fid
 
 ## Build on Windows 11 x64
 
+The original verified downloads are published in the fork's
+[experimental release ae-compat-e30d8d6d](https://github.com/simoescortez1-star/effectcraft/releases/tag/ae-compat-e30d8d6d).
+Extract `effectcraft-windows-x64-experimental.zip` completely and open `Launch.cmd`.
+This is a portable ZIP, not an MSI installer. It includes the separate converter and notices;
+it does not include commercial plugins. The original files were downloaded from the published
+release and their SHA256 hashes matched the local packages. These original GNU binaries remain
+cross-compiled and untested natively on Windows; publication does not change their validation.
+
+The additional `.github/workflows/after-effects-downloads.yml` is configured to build the
+editor/CLI and pinned converter natively on a Windows runner with MSVC and a static CRT,
+test the AE bridge/engine and external adapter, smoke-test `effectcraft-cli --version`,
+and upload Windows/source ZIPs, the report, metadata and checksums as an Actions artifact.
+A subsequent job publishes a separate prerelease named `ae-native-<source SHA>`.
+The workflow runs on pushes to the compatibility branch; its actual job results, rather
+than its presence in the repository, establish whether a native build succeeded.
+
+`package_downloads.py` requires the original compatibility commit to remain an ancestor,
+checks all three PE32+ x64 files and dependency notice coverage, and includes the original
+commit in the source bundle. Its license input is the original release ZIP pinned by SHA256;
+dependency changes that need additional notices stop packaging. `RELATORIO-base-e30d8d6d.md`
+is explicitly historical; `build.json` and `CLI-SMOKE.txt` record the new build's evidence.
+Native GUI operation and fidelity on Windows 11 still require testing by the user.
+
 Install Rust 1.95.0 with the MSVC x64 target, Visual Studio C++ Build Tools / Windows SDK,
 Git and Python 3. The editor is still a Rust/egui application.
 

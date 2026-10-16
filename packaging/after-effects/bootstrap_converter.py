@@ -17,6 +17,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--effectcraft", type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument("--work", type=Path, required=True, help="new directory outside the EffectCraft source tree")
+    parser.add_argument("--lock-file", type=Path, help="use an existing separate converter lockfile without updating it")
+    parser.add_argument("--target", help="explicit Rust target triple")
+    parser.add_argument("--release", action="store_true", help="build and test the release profile")
     options = parser.parse_args()
     source = options.effectcraft.resolve()
     work = options.work.resolve()
@@ -41,10 +44,19 @@ def main():
         text = text.replace(old, (source / "crates" / crate).as_posix())
     manifest.write_text(text, encoding="utf-8")
     # Start from the editor's registry versions; Cargo records the separate converter graph.
-    shutil.copyfile(source / "Cargo.lock", manifest.parent / "Cargo.lock")
-    run("cargo", "+1.95.0", "build", "--manifest-path", str(manifest), "--target-dir", str(work / "target"))
-    run("cargo", "+1.95.0", "test", "--locked", "--manifest-path", str(manifest), "--target-dir", str(work / "target"))
-    executable = work / "target/debug/aep-effectcraft"
+    shutil.copyfile(options.lock_file or source / "Cargo.lock", manifest.parent / "Cargo.lock")
+    arguments = ["--manifest-path", str(manifest), "--target-dir", str(work / "target")]
+    if options.target:
+        arguments.extend(["--target", options.target])
+    if options.release:
+        arguments.append("--release")
+    run("cargo", "+1.95.0", "build", *(["--locked"] if options.lock_file else []), *arguments)
+    run("cargo", "+1.95.0", "test", "--locked", *arguments)
+    executable = work / "target"
+    if options.target:
+        executable /= options.target
+    executable /= "release" if options.release else "debug"
+    executable /= "aep-effectcraft"
     if __import__("os").name == "nt":
         executable = executable.with_suffix(".exe")
     print(f"External converter: {executable}")

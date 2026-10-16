@@ -1,0 +1,28 @@
+{
+  "windows_x86_64_msvc-0.52.6": {
+    "name": "windows_x86_64_msvc",
+    "version": "0.52.6",
+    "license": "MIT OR Apache-2.0",
+    "repository": "https://github.com/microsoft/windows-rs",
+    "source": "registry+https://github.com/rust-lang/crates.io-index",
+    "notices": [
+      "license-mit",
+      "license-apache-2.0",
+      "included/license-mit",
+      "included/license-apache-2.0"
+    ]
+  },
+  "windows_x86_64_msvc-0.53.1": {
+    "name": "windows_x86_64_msvc",
+    "version": "0.53.1",
+    "license": "MIT OR Apache-2.0",
+    "repository": "https://github.com/microsoft/windows-rs",
+    "source": "registry+https://github.com/rust-lang/crates.io-index",
+    "notices": [
+      "license-mit",
+      "license-apache-2.0",
+      "included/license-mit",
+      "included/license-apache-2.0"
+    ]
+  }
+}
