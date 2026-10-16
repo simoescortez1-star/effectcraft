@@ -1,6 +1,7 @@
 //! The command registry. Ids follow After Effects' menu structure; every menu item, panel button,
 //! shortcut and viewer/timeline gesture maps to one of these.
 
+mod after_effects;
 mod align;
 mod align_data;
 mod anim;
@@ -201,6 +202,7 @@ pub fn command_specs() -> &'static [CommandSpec] {
         v.extend(relink_moved::specs());
         v.extend(lottie::specs());
         v.extend(import_project::specs());
+        v.extend(after_effects::specs());
         v.extend(timeline::specs());
         v.extend(comp_more::specs());
         v.extend(frame_export::specs());

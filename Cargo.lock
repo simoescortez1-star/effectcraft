@@ -1167,6 +1167,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "effectcraft-ae-bridge"
+version = "0.10.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "effectcraft-automation"
 version = "0.10.0"
 dependencies = [
@@ -1230,6 +1238,7 @@ dependencies = [
 name = "effectcraft-engine"
 version = "0.10.0"
 dependencies = [
+ "effectcraft-ae-bridge",
  "effectcraft-color",
  "effectcraft-effects",
  "effectcraft-geom",
@@ -1347,6 +1356,7 @@ dependencies = [
 name = "effectcraft-host"
 version = "0.10.0"
 dependencies = [
+ "effectcraft-ae-bridge",
  "effectcraft-engine",
  "effectcraft-export",
  "effectcraft-expr",

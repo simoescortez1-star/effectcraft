@@ -278,6 +278,9 @@ pub(crate) fn submenu(app: &EffectcraftApp, source: &str, shown: String) -> Stri
 /// Chinese After Effects documentation and the catalogs the sibling Craft apps ship; see the
 /// pull request for the rows taken from #321.
 const SIMPLIFIED_CHINESE: &[(&str, &str, &str)] = &[
+    ("file.importAfterEffects", "After Effects Project...", "After Effects 项目..."),
+    ("effect.aex.manager", "Plugin Manager...", "插件管理器..."),
+    ("anim.applyAfterEffectsPreset", "Apply After Effects Preset...", "应用 After Effects 预设..."),
     ("", "EffectCraft", "EffectCraft"),
     ("app.about", "About EffectCraft...", "关于 EffectCraft..."),
     ("", "Settings...", "设置..."),
@@ -912,6 +915,9 @@ const SIMPLIFIED_CHINESE: &[(&str, &str, &str)] = &[
 /// entry per fixed menu row of the engine's menu tree, mirroring `SIMPLIFIED_CHINESE` in the
 /// vocabulary the sibling Craft apps' zh-hant catalogs use.
 const TRADITIONAL_CHINESE: &[(&str, &str, &str)] = &[
+    ("file.importAfterEffects", "After Effects Project...", "After Effects 專案..."),
+    ("effect.aex.manager", "Plugin Manager...", "外掛程式管理員..."),
+    ("anim.applyAfterEffectsPreset", "Apply After Effects Preset...", "套用 After Effects 預設..."),
     ("", "EffectCraft", "EffectCraft"),
     ("app.about", "About EffectCraft...", "關於 EffectCraft..."),
     ("", "Settings...", "設定..."),
@@ -1543,6 +1549,9 @@ const TRADITIONAL_CHINESE: &[(&str, &str, &str)] = &[
 ];
 
 const JAPANESE: &[(&str, &str, &str)] = &[
+    ("file.importAfterEffects", "After Effects Project...", "After Effectsプロジェクト..."),
+    ("effect.aex.manager", "Plugin Manager...", "プラグインマネージャー..."),
+    ("anim.applyAfterEffectsPreset", "Apply After Effects Preset...", "After Effectsプリセットを適用..."),
     ("", "EffectCraft", "EffectCraft"),
     ("app.about", "About EffectCraft...", "EffectCraftについて..."),
     ("", "Settings...", "設定..."),
@@ -2177,6 +2186,9 @@ const JAPANESE: &[(&str, &str, &str)] = &[
 /// Ukrainian motion-graphics vocabulary. Product names and technical identifiers stay verbatim.
 /// The (command, source) keys match the other catalogs; no proprietary localization was used.
 const UKRAINIAN: &[(&str, &str, &str)] = &[
+    ("file.importAfterEffects", "After Effects Project...", "Проєкт After Effects..."),
+    ("effect.aex.manager", "Plugin Manager...", "Керування плагінами..."),
+    ("anim.applyAfterEffectsPreset", "Apply After Effects Preset...", "Застосувати пресет After Effects..."),
     ("", "EffectCraft", "EffectCraft"),
     ("app.about", "About EffectCraft...", "Про EffectCraft..."),
     ("", "Settings...", "Налаштування..."),
@@ -2812,6 +2824,9 @@ const UKRAINIAN: &[(&str, &str, &str)] = &[
 /// Wording follows Adobe's Spanish After Effects documentation (helpx.adobe.com/es) where it
 /// names the feature, and macOS Spanish for the app menu.
 const SPANISH: &[(&str, &str, &str)] = &[
+    ("file.importAfterEffects", "After Effects Project...", "Proyecto de After Effects..."),
+    ("effect.aex.manager", "Plugin Manager...", "Administrador de plugins..."),
+    ("anim.applyAfterEffectsPreset", "Apply After Effects Preset...", "Aplicar ajuste preestablecido de After Effects..."),
     ("", "EffectCraft", "EffectCraft"),
     ("app.about", "About EffectCraft...", "Acerca de EffectCraft..."),
     ("", "Settings...", "Ajustes..."),
@@ -3445,6 +3460,9 @@ const SPANISH: &[(&str, &str, &str)] = &[
 /// Brazilian Portuguese: the same (command, English label) keys as `JAPANESE`, one entry
 /// per fixed menu row of the engine's menu tree.
 const PORTUGUESE: &[(&str, &str, &str)] = &[
+    ("file.importAfterEffects", "After Effects Project...", "Projeto do After Effects..."),
+    ("effect.aex.manager", "Plugin Manager...", "Gerenciador de plugins..."),
+    ("anim.applyAfterEffectsPreset", "Apply After Effects Preset...", "Aplicar predefinição do After Effects..."),
     ("", "EffectCraft", "EffectCraft"),
     ("app.about", "About EffectCraft...", "Sobre o EffectCraft..."),
     ("", "Settings...", "Configurações..."),
@@ -4080,6 +4098,9 @@ const PORTUGUESE: &[(&str, &str, &str)] = &[
 /// Russian (addition): the same (command, English label) keys as `JAPANESE`, one
 /// entry per fixed menu entry, in the same order.
 const RUSSIAN: &[(&str, &str, &str)] = &[
+    ("file.importAfterEffects", "After Effects Project...", "Проект After Effects..."),
+    ("effect.aex.manager", "Plugin Manager...", "Менеджер плагинов..."),
+    ("anim.applyAfterEffectsPreset", "Apply After Effects Preset...", "Применить заготовку After Effects..."),
     ("comp.copyFrame", "Copy Frame to Clipboard", "Копировать кадр в буфер обмена"),
     ("", "Front", "Передняя грань"),
     ("", "Bevel", "Фаска"),
@@ -4713,6 +4734,9 @@ const RUSSIAN: &[(&str, &str, &str)] = &[
 /// French (addition): the same (command, English label) keys as `JAPANESE`, one
 /// entry per fixed menu entry, in the same order.
 const FRENCH: &[(&str, &str, &str)] = &[
+    ("file.importAfterEffects", "After Effects Project...", "Projet After Effects..."),
+    ("effect.aex.manager", "Plugin Manager...", "Gestionnaire de modules externes..."),
+    ("anim.applyAfterEffectsPreset", "Apply After Effects Preset...", "Appliquer une animation prédéfinie After Effects..."),
     ("comp.copyFrame", "Copy Frame to Clipboard", "Copier l'image dans le presse-papiers"),
     ("", "Front", "Avant"),
     ("", "Bevel", "Biseau"),
@@ -5346,6 +5370,9 @@ const FRENCH: &[(&str, &str, &str)] = &[
 /// German (addition): the same (command, English label) keys as `JAPANESE`, one
 /// entry per fixed menu entry, in the same order.
 const GERMAN: &[(&str, &str, &str)] = &[
+    ("file.importAfterEffects", "After Effects Project...", "After Effects-Projekt..."),
+    ("effect.aex.manager", "Plugin Manager...", "Plug-in-Manager..."),
+    ("anim.applyAfterEffectsPreset", "Apply After Effects Preset...", "After Effects-Vorgabe anwenden..."),
     ("comp.copyFrame", "Copy Frame to Clipboard", "Frame in die Zwischenablage kopieren"),
     ("", "Front", "Vorderseite"),
     ("", "Bevel", "Abschrägung"),
@@ -5980,6 +6007,9 @@ const GERMAN: &[(&str, &str, &str)] = &[
 
 /// Czech (cs): original phrase translations of every fixed menu entry.
 const CZECH: &[(&str, &str, &str)] = &[
+    ("file.importAfterEffects", "After Effects Project...", "Projekt After Effects..."),
+    ("effect.aex.manager", "Plugin Manager...", "Správce zásuvných modulů..."),
+    ("anim.applyAfterEffectsPreset", "Apply After Effects Preset...", "Použít přednastavení After Effects..."),
     ("", "Front", "Přední strana"),
     ("", "Bevel", "Zkosení"),
     ("", "Side", "Boční strana"),

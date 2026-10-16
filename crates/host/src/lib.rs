@@ -83,6 +83,11 @@ impl Exporter for FileExporter {
 /// A new session with media, import, expressions, scripting and export enabled.
 pub fn session() -> Session {
     Session {
+        #[cfg(not(target_arch = "wasm32"))]
+        ae_converter: std::env::var_os("EFFECTCRAFT_AEP_CONVERTER").map(|path| {
+            Arc::new(effectcraft_ae_bridge::process::ExternalConverter { executable: path.into(), timeout: std::time::Duration::from_secs(120) })
+                as Arc<dyn effectcraft_ae_bridge::ProjectConverter>
+        }),
         // The desktop app, the CLI and the MCP server share installed Roto Brush models.
         models_dir: config_dir().map(|d| d.join("models")),
         exporter: Some(Arc::new(FileExporter::default())),

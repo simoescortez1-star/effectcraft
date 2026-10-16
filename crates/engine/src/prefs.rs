@@ -396,6 +396,7 @@ fn parse_hex(s: &str) -> Option<[u8; 3]> {
 #[serde(default, rename_all = "camelCase")]
 pub struct Prefs {
     pub version: u32,
+    pub after_effects: effectcraft_ae_bridge::discovery::PluginConfig,
     pub general: General,
     pub startup: Startup,
     pub project: ProjectPrefs,
@@ -444,6 +445,7 @@ impl Default for Prefs {
     fn default() -> Self {
         Prefs {
             version: PREFS_VERSION,
+            after_effects: Default::default(),
             general: General::default(),
             startup: Startup::default(),
             project: ProjectPrefs::default(),

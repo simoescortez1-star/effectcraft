@@ -59,6 +59,12 @@ pub fn dropped_files(app: &mut EffectcraftApp, ui: &egui::Ui, bounds: Rect) {
         errors.push(crate::i18n::tr_args("Skipped {} dropped file(s) without a local path. Use File ▸ Import ▸ File…", &[&skipped]));
     }
 
+    let (presets, paths): (Vec<String>, Vec<String>) = paths.into_iter().partition(|p| p.to_ascii_lowercase().ends_with(".ffx"));
+    for path in presets {
+        if let Err(e) = app.session.execute("anim.applyAfterEffectsPreset", json!({"path": path})) {
+            errors.push(e.to_string());
+        }
+    }
     let (proj, rest): (Vec<String>, Vec<String>) = paths.into_iter().partition(|p| {
         let l = p.to_ascii_lowercase();
         l.ends_with(".ecproj") || l.ends_with(".ecprojx")

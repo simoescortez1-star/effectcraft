@@ -1,5 +1,8 @@
 # File format parity
 
+> This modified edition adds an experimental external AEP import bridge. The upstream parity
+> assessment below is historical; see [the edition-specific compatibility matrix](after-effects-compatibility.md).
+
 > **Last reviewed:** 2026-10-12 · **Last updated:** 2026-10-12 · **Change:** minor (closed issue references re-audited against `upstream/main` 470ea7a3) · **Target:** Adobe After Effects 2026
 
 Every format After Effects reads or writes, with EffectCraft's support. After Effects' list comes

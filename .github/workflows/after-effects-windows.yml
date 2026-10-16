@@ -1,0 +1,32 @@
+name: Experimental After Effects edition (Windows x64)
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - crates/ae-bridge/**
+      - crates/engine/src/commands/after_effects.rs
+      - crates/engine/src/commands/import_project.rs
+      - crates/ui-egui/src/panels/ae_plugins.rs
+      - packaging/after-effects/**
+      - .github/workflows/after-effects-windows.yml
+permissions:
+  contents: read
+jobs:
+  windows-x64:
+    runs-on: windows-2025
+    timeout-minutes: 90
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - name: Workspace quality gates
+        run: cargo xtask ci
+      - name: Build Windows MSVC x64 editor and CLI
+        run: cargo build --locked --release -p effectcraft -p effectcraft-cli --target x86_64-pc-windows-msvc
+      - name: Build and test separate pinned converter
+        shell: pwsh
+        run: python packaging/after-effects/bootstrap_converter.py --work "$env:RUNNER_TEMP/aep-bridge"

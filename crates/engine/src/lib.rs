@@ -97,6 +97,14 @@ pub type Result<T> = std::result::Result<T, EngineError>;
 /// Host services (file access) injected by the frontend.
 pub trait Services: Send + Sync {
     fn read_file(&self, path: &str) -> std::io::Result<Vec<u8>>;
+    /// Hosts should enforce this during reading; the default checks an in-memory service.
+    fn read_file_bounded(&self, path: &str, limit: usize) -> std::io::Result<Vec<u8>> {
+        let bytes = self.read_file(path)?;
+        if bytes.len() > limit {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "file exceeds import size limit"));
+        }
+        Ok(bytes)
+    }
     fn write_file(&self, path: &str, data: &[u8]) -> std::io::Result<()>;
     /// Whether a file exists (the background footage check after open).
     fn exists(&self, path: &str) -> bool {
@@ -136,6 +144,15 @@ pub trait Services: Send + Sync {
 /// Native filesystem.
 pub struct FsServices;
 impl Services for FsServices {
+    fn read_file_bounded(&self, path: &str, limit: usize) -> std::io::Result<Vec<u8>> {
+        use std::io::Read;
+        let mut bytes = Vec::new();
+        std::fs::File::open(path)?.take((limit as u64).saturating_add(1)).read_to_end(&mut bytes)?;
+        if bytes.len() > limit {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "file exceeds import size limit"));
+        }
+        Ok(bytes)
+    }
     fn read_file(&self, path: &str) -> std::io::Result<Vec<u8>> {
         std::fs::read(path)
     }
@@ -472,6 +489,10 @@ pub struct Session {
     /// Loads WebAssembly effect plug-ins (set by the host that links `effectcraft-plugin` with
     /// its runtime): `effect.plugins.load`.
     pub plugin_loader: Option<PluginLoader>,
+    /// Explicit external AEP converter; never linked into the editor.
+    pub ae_converter: Option<Arc<dyn effectcraft_ae_bridge::ProjectConverter>>,
+    /// Last passive native-plugin scan, separate from renderable effects.
+    pub ae_plugins: effectcraft_ae_bridge::discovery::Scan,
     /// ScriptUI windows and panels opened by scripts (see [`scriptui`]).
     pub script_ui: scriptui::ScriptUi,
     /// The last physical-memory reading (Settings ▸ Memory & CPU budgets); `None` = unknown
@@ -592,6 +613,8 @@ impl Default for Session {
             snapshot: None,
             script: None,
             plugin_loader: None,
+            ae_converter: None,
+            ae_plugins: Default::default(),
             script_ui: scriptui::ScriptUi::default(),
             sys_memory: None,
             key_move: None,
@@ -1216,6 +1239,8 @@ mod rq_tests;
 mod tests;
 #[cfg(test)]
 mod tests_3d;
+#[cfg(test)]
+mod tests_after_effects;
 #[cfg(test)]
 mod tests_anim_presets;
 #[cfg(test)]

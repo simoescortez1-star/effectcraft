@@ -15,6 +15,7 @@ pub use super::comp_settings::CompDraft;
 
 #[derive(Clone, Debug, Default)]
 pub struct DialogState {
+    pub ae_folder: String,
     pub comp: CompDraft,
     /// The settings of the last composition made with New Composition (the next one starts
     /// from them, as in After Effects).
@@ -237,6 +238,7 @@ pub fn show(app: &mut EffectcraftApp, ctx: &egui::Context) {
     let t = app.tokens;
     match d {
         Dialog::About => about(app, ctx, &t),
+        Dialog::PluginManager => super::ae_plugins::show(app, ctx, &t),
         Dialog::NewComp | Dialog::CompSettings => comp_settings(app, ctx, &t, d == Dialog::CompSettings),
         Dialog::SolidSettings => solid(app, ctx, &t),
         Dialog::CommandPalette => palette(app, ctx, &t),
@@ -336,7 +338,7 @@ fn about_main(app: &mut EffectcraftApp, ui: &mut egui::Ui, t: &Tokens, cmd: &mut
         t.text_dim,
     );
     ui.add_space(12.0);
-    ui.label(tr("A clean-room, open-source compositor for motion graphics and visual effects: native on macOS, Windows and Linux, and in the browser. Part of the ArtCraft family of creative apps."));
+    ui.label(tr("Experimental compatibility edition based on the open-source EffectCraft compositor by the ArtCraft team and community. This modified build is maintained separately."));
     ui.add_space(14.0);
     let links: [(Icon, &str, &str, &'static str); 4] = [
         (Icon::Chat, "Join the ArtCraft Discord", effectcraft_engine::links::DISCORD, "help.discord"),

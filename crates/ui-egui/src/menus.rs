@@ -1282,6 +1282,10 @@ pub fn frontend(app: &mut EffectcraftApp, ctx: &egui::Context, id: &str, p: Valu
             app.ui.home_templates = true;
             Value::Null
         }
+        "effect.aex.manager" => {
+            app.dialog = Some(crate::Dialog::PluginManager);
+            Value::Null
+        }
         "effect.manage" | "anim.browsePresets" => {
             app.show_panel(PanelKind::EffectsPresets);
             Value::Null
@@ -1349,6 +1353,9 @@ fn file_dialog(app: &mut EffectcraftApp, id: &str, params: &Value) -> Option<Res
         "file.exportLottie" => ("path", Ask::Save("Animation.json")),
         "file.importLottie" => ("path", Ask::Open(&["json", "lottie"])),
         "file.importProject" => ("path", Ask::Open(&["ecproj", "ecprojx"])),
+        "file.importAfterEffects" => ("path", Ask::Open(&["aep", "aepx"])),
+        "anim.applyAfterEffectsPreset" => ("path", Ask::Open(&["ffx"])),
+        "effect.aex.addFolder" => ("folder", Ask::Folder),
         "file.importTimeline" => ("path", Ask::Open(&["xml", "fcpxml", "otio", "edl", "aaf", "omf"])),
         "render.saveCurrentPreview" => ("path", Ask::Save("Preview.mp4")),
         "file.runScript" if params.get("name").is_none() => ("path", Ask::Open(&["jsx", "js", "jsonl", "json", "txt"])),

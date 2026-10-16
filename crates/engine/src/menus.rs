@@ -539,6 +539,7 @@ File
     Multiple Files... | file.importMultiple
     Adobe Premiere Pro Project... | file.importTimeline
     EffectCraft Project... | file.importProject
+    After Effects Project... | file.importAfterEffects
     Placeholder... | file.importPlaceholder
     Solid... | file.importSolid
     Lottie... | file.importLottie
@@ -970,12 +971,14 @@ Effect
   Remove All | effect.removeAll
   ---
   Manage Effects... | effect.manage
+  Plugin Manager... | effect.aex.manager
   Load Effect Plug-in... | effect.plugins.load
   ---
   @effects
 Animation
   Save Animation Preset... | anim.savePreset
   Apply Animation Preset... | anim.applyPreset
+  Apply After Effects Preset... | anim.applyAfterEffectsPreset
   Recent Animation Presets
     @dynamic:recentPresets
     ---

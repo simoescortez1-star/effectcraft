@@ -12,6 +12,7 @@ repository = "https://github.com/storytold/effectcraft"
 
 [workspace.dependencies]
 # internal
+effectcraft-ae-bridge = { path = "crates/ae-bridge" }
 effectcraft-time = { path = "crates/time" }
 effectcraft-geom = { path = "crates/geom" }
 effectcraft-color = { path = "crates/color" }
