@@ -16,6 +16,29 @@ def apply(checkout):
             raise RuntimeError(f"pinned reader anchor changed: {name}")
         path.write_text(text.replace(old, new), encoding="utf-8")
     shutil.copyfile(here / "reader_compat.rs", checkout / "src/effectcraft_compat.rs")
+    path = checkout / "src/model.rs"
+    text = path.read_text(encoding="utf-8")
+    anchor = "pub struct Property {"
+    if text.count(anchor) != 1:
+        raise RuntimeError("pinned reader property model anchor changed")
+    path.write_text(text.replace(anchor, anchor + "\n    pub source_ticks_per_second: Option<u32>,"), encoding="utf-8")
+    path = checkout / "src/decode.rs"
+    text = path.read_text(encoding="utf-8")
+    anchor = '    let code = desc.and_then(|d| d.data.get(3)).copied();'
+    if text.count(anchor) != 1:
+        raise RuntimeError("pinned numeric clock anchor changed")
+    text = text.replace(anchor, '''    let saved_rate = desc.and_then(|d| d.u32(12)).filter(|r| *r != 0);
+    if saved_rate.is_some_and(|r| r > 1_000_000_000) {
+        return Err(Error::InvalidFormat { offset: c.offset, message: "invalid property timebase" });
+    }
+    let ticks = saved_rate.unwrap_or(ticks);
+''' + anchor)
+    anchor = '    let mut p = Property {\n        storage_dimensions: dims,'
+    if text.count(anchor) != 1:
+        raise RuntimeError("pinned numeric property anchor changed")
+    text = text.replace(anchor, '    let mut p = Property {\n        source_ticks_per_second: Some(ticks),\n        storage_dimensions: dims,')
+    text = text.replace('    let mut p = Property {\n        storage_dimensions: None,', '    let mut p = Property {\n        source_ticks_per_second: Some(ticks),\n        storage_dimensions: None,')
+    path.write_text(text, encoding="utf-8")
     path = checkout / "src/lib.rs"
     path.write_text(path.read_text(encoding="utf-8") + "\nmod effectcraft_compat;\npub use effectcraft_compat::effectcraft_preset;\n", encoding="utf-8")
     manifest = checkout / "examples/effectcraft/Cargo.toml"
@@ -27,6 +50,10 @@ def apply(checkout):
     if text.count(anchor) != 1:
         raise RuntimeError("pinned adapter entry anchor changed")
     text = text.replace(anchor, anchor + '\n    if bytes.get(8..12) == Some(b"FaFX") { return effectcraft_compat::preset(bytes); }')
+    anchor = '    let factor = match match_name {'
+    if text.count(anchor) != 1:
+        raise RuntimeError("pinned property mapping clock anchor changed")
+    text = text.replace(anchor, '    let ticks = source.source_ticks_per_second.unwrap_or(ticks);\n' + anchor)
     # AE saves 2D Position/Anchor/Scale vectors as two components in some presets.
     # Keep the target's existing third component instead of rejecting the vector.
     anchor = '        ([x, y, z], Value::Vec3(_)) => Ok(Value::Vec3([*x, *y, *z])),'
@@ -68,6 +95,7 @@ def apply(checkout):
                 }''')
     adapter.write_text(text + "\nmod effectcraft_compat;\n", encoding="utf-8")
     shutil.copyfile(here / "adapter_compat.rs", adapter.parent / "effectcraft_compat.rs")
+    shutil.copyfile(here / "preset_reader_tests.rs", adapter.parent.parent / "tests/preset_reader.rs")
     # Upstream asserts the former linear fallback. Keep its time/value regression
     # and update the expected diagnostic for this edition's explicit Bezier map.
     path = checkout / "examples/effectcraft/tests/import.rs"

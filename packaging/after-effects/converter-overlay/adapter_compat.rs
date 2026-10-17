@@ -7,7 +7,7 @@ pub(crate) fn preset(bytes: &[u8]) -> Result<Import> {
     if bytes.len() > 1024 * 1024 {
         return Err("FFX exceeds the experimental 1 MiB limit".into());
     }
-    let (nodes, diagnostics, clock, saved_clock) = ae::effectcraft_preset(bytes, 8000).map_err(|e| e.to_string())?;
+    let (nodes, diagnostics, clock, saved_clock, bindings) = ae::effectcraft_preset(bytes, 8000).map_err(|e| e.to_string())?;
     let mut project = Project::default();
     let mut report = Report::default();
     if saved_clock {
@@ -59,7 +59,7 @@ pub(crate) fn preset(bytes: &[u8]) -> Result<Import> {
     for byte in bytes {
         write!(&mut hex, "{byte:02x}").map_err(|e| e.to_string())?;
     }
-    layer.comment = serde_json::to_string(&serde_json::json!({"effectcraftPreset":1,"sourceTicksPerSecond":clock,"assumedTicksPerSecond":(!saved_clock).then_some(clock),"timingSource":if saved_clock {"saved-container/property-metadata"} else {"legacy-assumption"},"timingVerified":false,"sourceHex":hex,"nodes":nodes,"mappedPaths":paths,"availableEffects":available,"unavailableEffects":unavailable})).map_err(|e|e.to_string())?;
+    layer.comment = serde_json::to_string(&serde_json::json!({"effectcraftPreset":1,"sourceTicksPerSecond":clock,"assumedTicksPerSecond":(!saved_clock).then_some(clock),"timingSource":if saved_clock {"saved-container/property-metadata"} else {"legacy-assumption"},"timingVerified":false,"sourceHex":hex,"nodes":nodes,"bindings":bindings,"mappedPaths":paths,"availableEffects":available,"unavailableEffects":unavailable})).map_err(|e|e.to_string())?;
     if layer.comment.len() > 6 * 1024 * 1024 {
         return Err("decoded preset metadata exceeds 6 MiB".into());
     }

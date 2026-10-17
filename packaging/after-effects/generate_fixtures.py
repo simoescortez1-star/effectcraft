@@ -73,7 +73,8 @@ def main():
     scale = numeric_settings(3, 48000, [(24000, [0.5, 0.75, 1.0]), (48000, [1.5, 1.25, 1.0])])
     body = saved_clock(48000) + target_path("ADBE Scale") + chunk(b"tdsn", b"Different display label") + sentinel + scale
     (options.out / "scale.ffx").write_bytes(chunk(b"RIFX", b"FaFX" + group(b"besc", body)))
-    wrong_clock = saved_clock(24000) + target_path("ADBE Scale") + sentinel + scale
+    # Conflicting container declarations are invalid; per-property clocks may differ.
+    wrong_clock = saved_clock(24000) + saved_clock(48000) + target_path("ADBE Scale") + sentinel + scale
     (options.out / "conflicting-clock.ffx").write_bytes(chunk(b"RIFX", b"FaFX" + group(b"besc", wrong_clock)))
     records = []
     for name, values in [("ADBE Position", [16., 16.]), ("ADBE Anchor Point", [16., 16.]),
