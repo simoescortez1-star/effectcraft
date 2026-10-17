@@ -1255,6 +1255,7 @@ pub fn frontend(app: &mut EffectcraftApp, ctx: &egui::Context, id: &str, p: Valu
             let summary = p.get("summary").and_then(Value::as_str);
             crate::panels::dialogs::info(app, &title, summary.unwrap_or(&text));
             app.dialog_state.info_details = summary.map(|_| text);
+            app.dialog_state.info_json = p.get("json").cloned();
             Value::Null
         }
         "window.assignWorkspaceShortcut" => {

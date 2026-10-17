@@ -8,6 +8,7 @@
 
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
+pub mod after_effects;
 pub mod audio_fx;
 mod blur2;
 mod blur3;
@@ -448,6 +449,16 @@ impl EffectCtx<'_> {
 }
 
 pub type RenderFn = fn(&EffectCtx, Buf) -> Buf;
+
+/// Warp/tile intermediates are bounded independently of hostile imported percentages.
+pub const MAX_GEOMETRY_EFFECT_PIXELS: u64 = 64 * 1024 * 1024;
+pub fn geometry_effect_extent_supported(width: u32, height: u32) -> bool {
+    width > 0
+        && height > 0
+        && width <= 32768
+        && height <= 32768
+        && u64::from(width).checked_mul(u64::from(height)).is_some_and(|n| n <= MAX_GEOMETRY_EFFECT_PIXELS)
+}
 
 pub struct EffectSpec {
     pub id: &'static str,

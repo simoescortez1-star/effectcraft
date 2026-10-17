@@ -1,5 +1,8 @@
 <h1 align="center">CortezEffects</h1>
 
+Native FFX work: [measured Warp / Scale + Motion Tile report](docs/ffx-native-effects.md), typed
+effect bindings, per-property clocks and preserved diagnostics. Compatibility remains partial.
+
 <p align="center"><img src="assets/cortezeffects/cortezeffects-256.png" alt="CortezEffects Ce glass icon" width="128"></p>
 
 **Experimental Windows edition based on EffectCraft.** Liquid Glass themes and persistent personalization preserve the existing AEP, FFX and experimental AEX work. Sapphire compatibility remains unverified. See the [redesign report](docs/cortezeffects-redesign.md), [compatibility guide](docs/after-effects-compatibility.md) and [published builds](https://github.com/simoescortez1-star/effectcraft/releases). The upstream project documentation and credits below are retained for provenance.

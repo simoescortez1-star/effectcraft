@@ -47,6 +47,7 @@ pub struct DialogState {
     /// Message box (title, body).
     pub info: (String, String),
     pub info_details: Option<String>,
+    pub info_json: Option<serde_json::Value>,
     pub camera: super::dialogs_3d::CameraDraft,
     pub light: super::dialogs_3d::LightDraft,
     pub velocity: super::key_dialogs::VelocityDraft,

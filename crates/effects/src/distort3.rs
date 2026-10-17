@@ -691,13 +691,23 @@ fn warp(ctx: &EffectCtx, mut b: Buf) -> Buf {
     let k = ctx.params.f("bend") / 100.0;
     let hd = ctx.params.f("horizontalDistortion") / 100.0;
     let vd = ctx.params.f("verticalDistortion") / 100.0;
+    if [k, hd, vd].iter().any(|v| !v.is_finite()) {
+        log::warn!("Warp has non-finite evaluated parameters; input pixels preserved");
+        return b;
+    }
     if k == 0.0 && hd == 0.0 && vd == 0.0 {
         return b;
     }
     let (hx, hy) = (ctx.layer_size[0] * b.scale * 0.5, ctx.layer_size[1] * b.scale * 0.5);
     if !ctx.adjustment {
         let pad = ((k.abs() + hd.abs() + vd.abs()) * 0.6 * hx.max(hy)).ceil().min(4096.0);
-        b.pad(pad as u32 + 1);
+        let pad = pad as u32 + 1;
+        let size = b.img.width.checked_add(pad.saturating_mul(2)).zip(b.img.height.checked_add(pad.saturating_mul(2)));
+        if !size.is_some_and(|(w, h)| crate::geometry_effect_extent_supported(w, h)) {
+            log::warn!("Warp output exceeds supported geometry; input pixels preserved");
+            return b;
+        }
+        b.pad(pad);
     }
     b.img = remap(&b.img, false, warp_inverse(ctx, &b));
     b
@@ -1066,6 +1076,15 @@ mod tests {
     fn maxd(a: &Image, b: &Image) -> f32 {
         assert_eq!((a.width, a.height), (b.width, b.height));
         a.data.iter().zip(&b.data).map(|(p, q)| (0..4).map(|i| (p[i] - q[i]).abs()).fold(0.0, f32::max)).fold(0.0, f32::max)
+    }
+
+    #[test]
+    fn warp_rejects_unbounded_geometry_and_non_finite_parameters() {
+        for bend in [1e300, f64::INFINITY] {
+            let input = img(2, 2);
+            let out = run("ec.distort.warp", &[("bend", Value::Scalar(bend))], input.clone(), &[]);
+            assert_eq!(out.img, input);
+        }
     }
 
     fn rect_mask(x0: f64, y0: f64, x1: f64, y1: f64) -> MaskShape {

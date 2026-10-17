@@ -54,6 +54,7 @@ fn batched_paths_and_interleaved_paths_bind_each_saved_payload_once() {
         let (nodes, _, _, _, bindings) = effectcraft_preset(&preset(&parts), 8000).unwrap();
         assert_eq!(nodes.iter().map(|n| n.match_name.as_str()).collect::<Vec<_>>(), ["first", "second"]);
         assert_eq!(bindings.len(), 2);
+        assert_eq!(nodes[1].index, 1);
         for (node, expected) in nodes.iter().zip([7.0, 9.0]) {
             assert_eq!(node.property.as_ref().unwrap().static_value.as_ref().unwrap().numbers().unwrap()[0].value, Some(expected));
         }

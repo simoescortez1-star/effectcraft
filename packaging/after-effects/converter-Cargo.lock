@@ -14,6 +14,7 @@ version = "0.1.0"
 dependencies = [
  "aep-reader",
  "effectcraft-color",
+ "effectcraft-effects",
  "effectcraft-keyframe",
  "effectcraft-project",
  "effectcraft-render",

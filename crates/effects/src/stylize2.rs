@@ -440,6 +440,10 @@ fn motion_tile(ctx: &EffectCtx, b: Buf) -> Buf {
         let oh = (lh * ctx.params.f("outputHeight") / 100.0).max(1.0 / s);
         ((ow * s).round().max(1.0) as u32, (oh * s).round().max(1.0) as u32, [(ow - lw) * 0.5 * s, (oh - lh) * 0.5 * s])
     };
+    if !crate::geometry_effect_extent_supported(nw, nh) || noff.iter().any(|v| !v.is_finite()) {
+        log::warn!("Motion Tile output exceeds supported geometry; input pixels preserved");
+        return b;
+    }
     let mut out = Image::new(nw, nh);
     let src = &b.img;
     out.rows_mut().for_each(|(y, row)| {
@@ -463,7 +467,16 @@ fn motion_tile(ctx: &EffectCtx, b: Buf) -> Buf {
                     fy = 1.0 - fy;
                 }
             }
-            *px = src.sample_bilinear(fx * lw * s + b.offset[0], fy * lh * s + b.offset[1]);
+            let (sx, sy) = (fx * lw * s + b.offset[0], fy * lh * s + b.offset[1]);
+            *px = if mirror {
+                // Reflect the border texels too: fractional output extents must not sample
+                // transparent pixels outside an otherwise opaque mirrored source tile.
+                let min = [b.offset[0] + 0.5, b.offset[1] + 0.5];
+                let max = [(b.offset[0] + lw * s - 0.5).max(min[0]), (b.offset[1] + lh * s - 0.5).max(min[1])];
+                src.sample_bilinear_clamped(sx.clamp(min[0], max[0]), sy.clamp(min[1], max[1]))
+            } else {
+                src.sample_bilinear(sx, sy)
+            };
         }
     });
     Buf { img: out, offset: noff, scale: s }
@@ -812,6 +825,20 @@ mod tests {
         for (a, b) in same.img.data.iter().zip(img.data.iter()) {
             assert!((a[0] - b[0]).abs() < 1e-4);
         }
+    }
+
+    #[test]
+    fn motion_tile_rejects_unbounded_imported_output_before_allocation() {
+        let input = ramp(10, 8);
+        let out = run_at("ec.stylize.motiontile", &[("outputWidth", num(1e300)), ("outputHeight", num(1e300))], input.clone(), 0.0);
+        assert_eq!(out.img, input);
+    }
+
+    #[test]
+    fn mirrored_motion_tile_has_no_transparent_seams_with_fractional_bounds() {
+        let out =
+            run_at("ec.stylize.motiontile", &[("outputWidth", num(410.0)), ("outputHeight", num(390.0)), ("mirrorEdges", Value::Bool(true))], ramp(10, 8), 0.0);
+        assert!(out.img.data.iter().all(|p| (p[3] - 1.0).abs() < 1e-6), "opaque mirrored tiles must stay opaque between repetitions");
     }
 
     #[test]

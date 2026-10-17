@@ -121,6 +121,7 @@ pub fn form(app: &mut EffectcraftApp, title: &str, command: &str, base: Value, f
 pub fn info(app: &mut EffectcraftApp, title: &str, body: &str) {
     app.dialog_state.info = (title.into(), body.into());
     app.dialog_state.info_details = None;
+    app.dialog_state.info_json = None;
     app.dialog = Some(Dialog::Info);
 }
 
@@ -925,6 +926,8 @@ pub(crate) fn close_info(app: &mut EffectcraftApp) {
 pub fn show_info(app: &mut EffectcraftApp, ctx: &egui::Context, t: &Tokens) {
     let (title, body) = app.dialog_state.info.clone();
     let details = app.dialog_state.info_details.clone();
+    let report = app.dialog_state.info_json.clone();
+    let mut export = false;
     // Enter presses OK, the default (and only) button.
     let mut close = !ctx.egui_wants_keyboard_input() && ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter));
     // The text wraps within this small dialog; avoid a horizontal scrollbar changing its height.
@@ -941,8 +944,20 @@ pub fn show_info(app: &mut EffectcraftApp, ctx: &egui::Context, t: &Tokens) {
             if ui.add(egui::Button::new(egui::RichText::new(tr("   OK   ")).color(Color32::WHITE)).fill(t.accent)).clicked() {
                 close = true;
             }
+            if report.is_some() {
+                let r = ui.button(tr("Export JSON..."));
+                app.auto.add("report.exportJson", r.rect, "Export JSON...");
+                export = r.clicked();
+            }
         });
     });
+    if export
+        && let Some(report) = &report
+        && let Some(path) = app.hooks.pick_save_file.as_ref().and_then(|pick| pick("After-Effects-FFX-report.json", "json"))
+        && let Err(error) = app.session.execute("anim.exportAfterEffectsPresetReport", json!({"path":path,"layers":report.get("layers")}))
+    {
+        app.ui.status = error.to_string();
+    }
     if close {
         close_info(app);
     }

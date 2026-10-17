@@ -1266,6 +1266,8 @@ mod tests_essential_more;
 #[cfg(test)]
 mod tests_face;
 #[cfg(test)]
+mod tests_ffx_native;
+#[cfg(test)]
 mod tests_fidelity;
 #[cfg(test)]
 mod tests_frame_export;

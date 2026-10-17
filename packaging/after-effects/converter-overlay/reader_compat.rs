@@ -76,5 +76,17 @@ pub fn effectcraft_preset(bytes: &[u8], fallback_ticks: u32) -> Result<(Vec<Prop
     if result.is_empty() {
         return Err(Error::InvalidFormat { offset: 12, message: "no supported preset property settings blocks" });
     }
+    fn indices(nodes: &mut [PropertyNode], depth: usize, limit: usize) -> Result<(), Error> {
+        if depth > limit {
+            return Err(Error::InvalidFormat { offset: 0, message: "preset property depth exceeds limit" });
+        }
+        for (index, node) in nodes.iter_mut().enumerate() {
+            node.index = index;
+            node.depth = depth;
+            indices(&mut node.children, depth + 1, limit)?;
+        }
+        Ok(())
+    }
+    indices(&mut result, 0, limits.max_depth)?;
     Ok((result, diagnostics, ticks, saved_clock.or(descriptor_clock).is_some(), bindings))
 }

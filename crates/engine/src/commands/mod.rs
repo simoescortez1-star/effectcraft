@@ -20,6 +20,7 @@ mod edit;
 mod effect;
 pub mod essential;
 pub mod expr_tools;
+mod ffx_support;
 mod file;
 pub(crate) mod file_more;
 mod focus;

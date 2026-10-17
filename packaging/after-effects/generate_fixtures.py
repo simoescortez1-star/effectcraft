@@ -25,7 +25,7 @@ def target_path(name):
                             for part in ["ADBE Transform Group", name]))
 
 
-def numeric_settings(dimensions, rate, keys, *, bezier=True):
+def numeric_settings(dimensions, rate, keys, *, bezier=True, interpolation=None):
     descriptor = bytearray(124)
     descriptor[3] = dimensions
     struct.pack_into(">I", descriptor, 12, rate)
@@ -37,7 +37,8 @@ def numeric_settings(dimensions, rate, keys, *, bezier=True):
     for tick, values in keys:
         key = bytearray(stride)
         struct.pack_into(">I", key, 0, tick)
-        key[4:6] = b"\2\2" if bezier else b"\1\1"
+        mode = interpolation if interpolation is not None else (2 if bezier else 1)
+        key[4:6] = bytes([mode, mode])
         fields = list(values) + [0.0] * dimensions + [1 / 3] * dimensions + [0.0] * dimensions + [1 / 3] * dimensions
         struct.pack_into(">" + "d" * len(fields), key, 8, *fields)
         data.extend(key)
@@ -85,6 +86,8 @@ def main():
     parameter = chunk(b"tdmn", b"org.effectcraft.test.unavailable-0001") + group(b"tdbs", chunk(b"tdb4", descriptor),chunk(b"cdat",struct.pack(">d",2.5)))
     unavailable = chunk(b"RIFX",b"FaFX"+group(b"besc",group(b"tdsp",chunk(b"tdmn",b"org.effectcraft.test.unavailable")),group(b"sspc",group(b"tdgp",parameter))))
     (options.out / "unavailable.ffx").write_bytes(unavailable)
+    from generate_native_fixtures import generate
+    generate(options.out)
 
 
 if __name__ == "__main__":

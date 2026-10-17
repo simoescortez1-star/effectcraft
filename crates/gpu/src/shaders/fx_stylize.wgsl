@@ -611,7 +611,15 @@ fn fxs_motiontile(@builtin(global_invocation_id) gid: vec3<u32>) {
             fy = 1.0 - fy;
         }
     }
-    textureStore(out, p, sample_bilinear(src, fx * P.f[0].y + P.f[1].x, fy * P.f[0].z + P.f[1].y));
+    let point = vec2<f32>(fx * P.f[0].y + P.f[1].x, fy * P.f[0].z + P.f[1].y);
+    if (P.u[0].z != 0u) {
+        let lo = P.f[1].xy + vec2<f32>(0.5);
+        let hi = max(lo, P.f[1].xy + P.f[0].yz - vec2<f32>(0.5));
+        let q = clamp(point, lo, hi);
+        textureStore(out, p, sample_bilinear_clamped(src, q.x, q.y));
+    } else {
+        textureStore(out, p, sample_bilinear(src, point.x, point.y));
+    }
 }
 
 // CC RepeTile (stylize2::repetile) into a new output size. data: per output column (tile index,

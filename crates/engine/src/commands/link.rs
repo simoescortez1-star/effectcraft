@@ -13,7 +13,7 @@ const AXES: [(&str, &str); 3] = [("positionX", "X Position"), ("positionY", "Y P
 
 /// Per-dimension scalar keys from a (spatial) position key list: same times and interpolation;
 /// Bezier sides get the per-dimension velocity the combined property had at the key.
-fn split_keys(keys: &[Keyframe], spatial: bool, d: usize) -> Vec<Keyframe> {
+pub(super) fn split_keys(keys: &[Keyframe], spatial: bool, d: usize) -> Vec<Keyframe> {
     let h = Tick(TICKS_PER_SECOND / 2000);
     keys.iter()
         .map(|k| {

@@ -29,10 +29,12 @@ def main():
                EFFECTCRAFT_AEX_WORKER=str(native / "effectcraft-aex-worker.exe"),
                EFFECTCRAFT_TEST_FFX=str(out / "opacity.ffx"), EFFECTCRAFT_TEST_AEX=str(plugin))
     results = {}
-    for test in ["ffx_external_generated_end_to_end", "ffx_direct_transform_presets_render_and_preserve_saved_timebase",
-                 "aex_native_worker_renders_and_recovers_after_child_exit"]:
+    for module, test in [("tests_after_effects", "ffx_external_generated_end_to_end"),
+                         ("tests_after_effects", "ffx_direct_transform_presets_render_and_preserve_saved_timebase"),
+                         ("tests_ffx_native", "generated_native_ffx_cases_apply_render_export_persist_and_undo"),
+                         ("tests_after_effects", "aex_native_worker_renders_and_recovers_after_child_exit")]:
         result = subprocess.run(["cargo", "+1.95.0", "test", "--locked", "--release", "--target", "x86_64-pc-windows-msvc",
-                                 "-p", "effectcraft-engine", "--lib", f"tests_after_effects::{test}", "--", "--ignored", "--exact", "--nocapture"],
+                                 "-p", "effectcraft-engine", "--lib", f"{module}::{test}", "--", "--ignored", "--exact", "--nocapture"],
                                 cwd=root, env=env, text=True, encoding="utf-8", capture_output=True, errors="replace", timeout=900)
         log = result.stdout + result.stderr
         (out / f"{test}.txt").write_text(log, encoding="utf-8")
@@ -40,6 +42,13 @@ def main():
         if result.returncode != 0 or "1 passed; 0 failed" not in log:
             raise RuntimeError(f"required native Windows render regression failed or did not run: {test}")
         results[test] = True
+    cases = json.loads((out / "native-cases.json").read_text(encoding="utf-8"))
+    generated_log = (out / "generated_native_ffx_cases_apply_render_export_persist_and_undo.txt").read_text(encoding="utf-8")
+    if len(cases) < 15 or f"{len(cases)} original generated FFX cases verified" not in generated_log:
+        raise RuntimeError("the required native FFX matrix did not run completely")
+    results["generated_native_ffx_case_count"] = len(cases)
+    results["generated_fixtures_authored_by_after_effects"] = False
+    results["private_user_fixtures_tested_on_windows"] = False
     results["source_commit"] = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
     # Run the exact portable CLI arrangement users receive; no Python on their PC.
     diagnostic = root / "target/x86_64-pc-windows-msvc/release/effectcraft-aex-diagnostic.exe"

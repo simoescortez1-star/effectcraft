@@ -205,6 +205,26 @@ fn load_and_apply_native(s: &mut Session, p: &Value) -> Result<Value> {
     Ok(loaded)
 }
 
+fn export_preset_report(s: &mut Session, p: &Value) -> Result<Value> {
+    const C: &str = "anim.exportAfterEffectsPresetReport";
+    let path = str_p(p, "path").filter(|p| !p.is_empty() && p.len() <= 4096).ok_or_else(|| bad(C, "expected a report output path"))?;
+    let (cid, ids) = layers_p(s, p)?;
+    let id = ids.first().ok_or_else(|| bad(C, "select a layer with an imported FFX"))?;
+    let layer = s.project.comp(cid).and_then(|c| c.layer(*id)).ok_or_else(|| bad(C, "target layer is unavailable"))?;
+    let (_, record) = layer.comment.rsplit_once("\nEffectCraft FFX preservation:\n").ok_or_else(|| bad(C, "layer has no preserved FFX report"))?;
+    if record.len() > 8 * 1024 * 1024 {
+        return Err(bad(C, "preserved FFX report exceeds 8 MiB"));
+    }
+    let record: Value = serde_json::from_str(record).map_err(|e| bad(C, format!("invalid preserved FFX report: {e}")))?;
+    let report = json!({"schema":1,"kind":"CortezEffectsFFXReport","layer":id.0,"record":record,"currentLayerProperties":layer.props,"nativeRegistry":effectcraft_effects::after_effects::registry(),"visualEquivalenceVerified":false});
+    let bytes = serde_json::to_vec_pretty(&report).map_err(|e| bad(C, e.to_string()))?;
+    if bytes.len() > 16 * 1024 * 1024 {
+        return Err(bad(C, "exported report exceeds 16 MiB"));
+    }
+    s.services.write_file(path, &bytes).map_err(|e| bad(C, format!("cannot write JSON report: {e}")))?;
+    Ok(json!({"path":path,"bytes":bytes.len(),"layer":id.0}))
+}
+
 /// Apply only explicitly mapped properties from the data-only external preset carrier.
 /// Unavailable effects retain their original bytes and tree in the layer comment.
 fn apply_preset(s: &mut Session, p: &Value) -> Result<Value> {
@@ -248,7 +268,10 @@ fn apply_preset(s: &mut Session, p: &Value) -> Result<Value> {
     }
     let mut properties = Vec::new();
     for path in paths {
-        let path = path.as_str().filter(|p| p.starts_with("transform/") && p.len() < 128).ok_or_else(|| bad(C, "invalid preset property path"))?;
+        let path = path
+            .as_str()
+            .filter(|p| effectcraft_effects::after_effects::TRANSFORMS.iter().any(|(_, path)| path == p))
+            .ok_or_else(|| bad(C, "invalid preset property path"))?;
         let property = source.props.prop(path).ok_or_else(|| bad(C, "preset property missing from carrier"))?;
         properties.push((path.to_string(), property.clone()));
     }
@@ -261,6 +284,30 @@ fn apply_preset(s: &mut Session, p: &Value) -> Result<Value> {
             effects.push(effect.clone());
         }
     }
+    if effects.len() > 256 {
+        return Err(bad(C, "preset exceeds 256 effects"));
+    }
+    let mut normalized_points = Vec::new();
+    if let Some(points) = metadata.get("normalizedPointParameters").and_then(Value::as_array) {
+        if points.len() > 256 {
+            return Err(bad(C, "too many target-dependent point conversions"));
+        }
+        for point in points {
+            let index = point
+                .get("effectIndex")
+                .and_then(Value::as_u64)
+                .and_then(|n| usize::try_from(n).ok())
+                .filter(|n| *n < effects.len())
+                .ok_or_else(|| bad(C, "invalid point conversion effect index"))?;
+            let parameter =
+                point.get("parameter").and_then(Value::as_str).filter(|s| s.len() < 128).ok_or_else(|| bad(C, "invalid point conversion parameter"))?;
+            normalized_points.push((index, parameter.to_string()));
+        }
+    }
+    let sizes: Vec<_> = {
+        let comp = s.project.comp(cid).ok_or(crate::EngineError::NoComp)?;
+        ids.iter().filter_map(|id| comp.layer(*id)).map(|l| (l.id, effectcraft_render::effect_bounds(&s.project, comp, l).0)).collect()
+    };
     let unavailable = metadata.get("unavailableEffects").cloned().unwrap_or_else(|| json!([]));
     // Correlate exact identities only. Presence or a successful defaults render is
     // not sufficient evidence for applying a commercial effect's saved controls.
@@ -269,7 +316,7 @@ fn apply_preset(s: &mut Session, p: &Value) -> Result<Value> {
             .map(|p|json!({"path":p.path,"loaded":p.loaded,"initialized":p.initialized,"rendered":p.rendered})).collect();
         json!({"matchName":match_name,"matchingModules":modules,"presetBindingSupported":false,"reason":"Native type/ID mapping and custom preset data are not yet verified. Preset remains preserved; no replacement effect was created."})
     }).collect();
-    let mut uid_count = effects.len() as u64;
+    let mut uid_count = (effects.len() as u64).saturating_add(properties.len() as u64).saturating_add(3);
     let mut pending: Vec<_> = effects.iter().collect();
     while let Some(group) = pending.pop() {
         uid_count = uid_count.checked_add(group.children.len() as u64).ok_or_else(|| bad(C, "preset node count overflow"))?;
@@ -281,20 +328,27 @@ fn apply_preset(s: &mut Session, p: &Value) -> Result<Value> {
     }
     let applied = !properties.is_empty() || !effects.is_empty();
     let property_count = properties.len().saturating_mul(ids.len());
-    let keyframe_count = properties.iter().fold(0_usize, |total, (_, p)| total.saturating_add(p.keys.len())).saturating_mul(ids.len());
+    let transform_keyframe_count = properties.iter().fold(0_usize, |total, (_, p)| total.saturating_add(p.keys.len())).saturating_mul(ids.len());
+    let mut effect_keyframe_count = 0_usize;
+    for group in &effects {
+        group.walk("", &mut |_, p| effect_keyframe_count = effect_keyframe_count.saturating_add(p.keys.len()));
+    }
+    effect_keyframe_count = effect_keyframe_count.saturating_mul(ids.len());
+    let keyframe_count = transform_keyframe_count.saturating_add(effect_keyframe_count);
     let mut revealed = Vec::new();
     let now = s.time();
     let report: Value = serde_json::from_str(&converted.report_json).map_err(|e| bad(C, e.to_string()))?;
-    let record = json!({"source":path,"preset":metadata,"conversionReport":report}).to_string();
+    let record = json!({"source":path,"preset":metadata,"conversionReport":report,"application":{"propertiesApplied":property_count,"keyframesApplied":keyframe_count,"effectKeyframesApplied":effect_keyframe_count,"effectsApplied":effects.len().saturating_mul(ids.len())},"renderStatus":"not asserted by import; inspect preview/export","visualEquivalenceVerified":false}).to_string();
     if record.len().checked_mul(ids.len()).is_none_or(|n| n > 64 * 1024 * 1024) {
         return Err(bad(C, "preset preservation exceeds 64 MiB"));
     }
     s.edit("Apply After Effects Preset", None, |project, _| {
-        for id in &ids {
+        for (id, size) in &sizes {
             let mut next = project.next_id;
             let layer = layer_mut(project, cid, *id)?;
             let at = layer.layer_time(now);
             for (path, source) in &properties {
+                super::ffx_support::ensure_transform(layer, path, &mut next).map_err(|e| bad(C, e))?;
                 let target = layer.props.prop_mut(path).ok_or_else(|| bad(C, format!("target layer has no {path}")))?;
                 if std::mem::discriminant(&source.value) != std::mem::discriminant(&target.value) {
                     return Err(bad(C, "preset property dimensions differ"));
@@ -303,8 +357,22 @@ fn apply_preset(s: &mut Session, p: &Value) -> Result<Value> {
                 for key in &mut keys {
                     key.time = effectcraft_time::Tick(key.time.0.checked_add(at.0).ok_or_else(|| bad(C, "preset key time overflow"))?);
                 }
-                target.value = source.value.clone();
+                let mut value = source.value.clone();
+                if metadata.get("transformDimensions").and_then(|d| d.get(path)).and_then(Value::as_u64) == Some(2)
+                    && let effectcraft_keyframe::Value::Vec3(existing) = target.value
+                {
+                    if let effectcraft_keyframe::Value::Vec3(v) = &mut value {
+                        v[2] = existing[2];
+                    }
+                    for key in &mut keys {
+                        if let effectcraft_keyframe::Value::Vec3(v) = &mut key.value {
+                            v[2] = existing[2];
+                        }
+                    }
+                }
+                target.value = value;
                 target.keys = keys;
+                target.spatial = source.spatial;
                 revealed.push(json!({"layer":id.0,"prop":target.uid}));
                 target.expr = source.expr.clone();
                 if let Some(expression) = &mut target.expr {
@@ -313,8 +381,11 @@ fn apply_preset(s: &mut Session, p: &Value) -> Result<Value> {
             }
             if !effects.is_empty() {
                 let group = layer.props.sub_mut("effects").ok_or_else(|| bad(C, "target layer has no effects"))?;
-                for source in &effects {
+                for (index, source) in effects.iter().enumerate() {
                     let mut effect = source.clone();
+                    for (_, parameter) in normalized_points.iter().filter(|(i, _)| *i == index) {
+                        super::ffx_support::resolve_point(&mut effect, parameter, *size).map_err(|e| bad(C, e))?;
+                    }
                     let mut overflow = false;
                     effect.walk_mut(&mut |property| {
                         for key in &mut property.keys {
@@ -331,7 +402,15 @@ fn apply_preset(s: &mut Session, p: &Value) -> Result<Value> {
                     if overflow {
                         return Err(bad(C, "preset effect key time overflow"));
                     }
-                    effect.reassign_uids(&mut next);
+                    // reassign_uids takes the last allocated ID; the project stores the next free ID.
+                    let mut last = next.checked_sub(1).ok_or_else(|| bad(C, "invalid next property ID"))?;
+                    effect.reassign_uids(&mut last);
+                    next = last.checked_add(1).ok_or_else(|| bad(C, "preset property ID overflow"))?;
+                    effect.walk("", &mut |_, p| {
+                        if !p.keys.is_empty() {
+                            revealed.push(json!({"layer":id.0,"prop":p.uid}));
+                        }
+                    });
                     group.children.push(Node::Group(effect));
                 }
             }
@@ -352,7 +431,7 @@ fn apply_preset(s: &mut Session, p: &Value) -> Result<Value> {
     }
     let summary = if applied {
         format!(
-            "Applied {property_count} mapped transform property/properties and {keyframe_count} transform keyframe(s). Added {} effect(s). Inspect the details for timing and fidelity limits.",
+            "Applied {property_count} transform property/properties, {keyframe_count} keyframe(s) and {} native effect(s). Rendering is available for mapped native effects; visual equivalence is unverified. Inspect the details for preserved data and limitations.",
             effects.len().saturating_mul(ids.len())
         )
     } else if unavailable.as_array().is_some_and(|effects| !effects.is_empty()) {
@@ -361,17 +440,63 @@ fn apply_preset(s: &mut Session, p: &Value) -> Result<Value> {
         "Preset preserved as data only. No supported property/effect mapping was produced; rendered pixels were not changed. Inspect the property diagnostics."
             .to_string()
     };
+    let filename = path.rsplit(['/', '\\']).next().unwrap_or(path);
+    let mut resolution = metadata.get("effectResolution").cloned().unwrap_or_else(|| json!([]));
+    for effect in resolution.as_array_mut().into_iter().flatten() {
+        if effect.get("status").and_then(Value::as_str) == Some("mapped") {
+            effect["status"] = json!("applied");
+            for parameter in effect.get_mut("parameters").and_then(Value::as_array_mut).into_iter().flatten() {
+                if parameter.get("status").and_then(Value::as_str) == Some("mapped") {
+                    parameter["status"] = json!("applied");
+                }
+            }
+        }
+    }
+    let partial = unavailable.as_array().is_some_and(|v| !v.is_empty())
+        || resolution.as_array().is_some_and(|a| a.iter().any(|r| r.get("partial") == Some(&Value::Bool(true))));
+    let transforms:Vec<_>=properties.iter().map(|(path,p)|json!({"path":path,"value":p.value,"keyframes":p.keys.len(),"firstKey":p.keys.first(),"lastKey":p.keys.last(),"timeSpace":"preset-relative; shifted to the target layer playhead"})).collect();
+    let mut detected = 0_usize;
+    let mut pending: Vec<_> = metadata.get("nodes").and_then(Value::as_array).into_iter().flatten().collect();
+    while let Some(node) = pending.pop() {
+        if node.get("property").is_some_and(|v| !v.is_null()) {
+            detected = detected.saturating_add(1);
+        }
+        pending.extend(node.get("children").and_then(Value::as_array).into_iter().flatten());
+    }
+    let result = json!({"file":filename,"status":if applied {if partial {"partial"}else{"applied"}}else{"preserved"},"applied":applied,"preserved":true,"layers":ids.iter().map(|id|id.0).collect::<Vec<_>>(),"propertiesDetected":detected,"effectsDetected":resolution.as_array().map_or(0,Vec::len),"propertiesApplied":property_count,"keyframesApplied":keyframe_count,"transformKeyframesApplied":transform_keyframe_count,"effectKeyframesApplied":effect_keyframe_count,"effectsApplied":effects.len().saturating_mul(ids.len()),"transforms":transforms,"mappedPaths":paths,"sourceTicksPerSecond":metadata.get("sourceTicksPerSecond"),"effectResolution":resolution,"unavailableEffects":unavailable,"nativeEffects":native_effects,"warnings":warnings,"timingVerified":false,"rendered":false,"renderStatus":"awaiting preview/export; no AE equivalence claim"});
+    let details = format!(
+        "File: {filename}\nDetected properties: {detected}\n{}\n\nMapped transforms (preset-relative times):\n{}\n\nNative effect resolution:\n{}",
+        warnings.join("\n"),
+        serde_json::to_string_pretty(&transforms).map_err(|e| bad(C, e.to_string()))?,
+        serde_json::to_string_pretty(&resolution).map_err(|e| bad(C, e.to_string()))?
+    );
     s.events.push(crate::Event::Frontend {
         command: "app.showReport".into(),
-        params: json!({"title":"After Effects Preset Report","text":warnings.join("\n"),"summary":format!("{summary}\n{}",effectcraft_ae_bridge::warning_summary(&warnings))}),
+        params: json!({"title":"After Effects Preset Report","text":details,"summary":format!("{filename}\n{summary}\n{}",effectcraft_ae_bridge::warning_summary(&warnings)),"json":result}),
     });
-    Ok(
-        json!({"applied":applied,"preserved":true,"layers":ids.iter().map(|id|id.0).collect::<Vec<_>>(),"propertiesApplied":property_count,"keyframesApplied":keyframe_count,"effectsApplied":effects.len().saturating_mul(ids.len()),"mappedPaths":paths,"sourceTicksPerSecond":metadata.get("sourceTicksPerSecond"),"unavailableEffects":unavailable,"nativeEffects":native_effects,"warnings":warnings,"timingVerified":false}),
-    )
+    Ok(result)
 }
 
 pub fn specs() -> Vec<CommandSpec> {
     vec![
+        cmd!(
+            "anim.exportAfterEffectsPresetReport",
+            "Export After Effects Preset Report",
+            [],
+            None,
+            "{path,layers?} — export the latest preserved FFX tree, values, curves and diagnostics as JSON",
+            has_layers,
+            export_preset_report
+        ),
+        cmd!(
+            "anim.afterEffectsRegistry",
+            "After Effects Native Effect Mappings",
+            [],
+            None,
+            "{} — native effect identities, typed bindings, defaults and compatibility states",
+            always,
+            |_, _| Ok(json!({"effects":effectcraft_effects::after_effects::registry(),"transforms":effectcraft_effects::after_effects::transform_registry()}))
+        ),
         cmd!("effect.aex.manager", "Plugin Manager...", ["Effect"], None, "{} — open passive AEX plugin manager", always, |s, _| {
             s.events.push(crate::Event::Frontend { command: "effect.aex.manager".into(), params: json!({}) });
             Ok(Value::Null)

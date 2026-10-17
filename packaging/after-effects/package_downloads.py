@@ -102,8 +102,10 @@ def main():
             smoke = result.stdout + result.stderr
         sha = command(root, "git", "rev-parse", "HEAD")
         validation = json.loads((options.validation / "WINDOWS-VALIDATION.json").read_text(encoding="utf-8"))
-        if validation.get("source_commit") != sha or not all(validation.get(test) is True for test in ["ffx_external_generated_end_to_end", "ffx_direct_transform_presets_render_and_preserve_saved_timebase", "aex_native_worker_renders_and_recovers_after_child_exit", "aex_local_diagnostic"]):
+        if validation.get("source_commit") != sha or not all(validation.get(test) is True for test in ["ffx_external_generated_end_to_end", "ffx_direct_transform_presets_render_and_preserve_saved_timebase", "generated_native_ffx_cases_apply_render_export_persist_and_undo", "aex_native_worker_renders_and_recovers_after_child_exit", "aex_local_diagnostic"]):
             raise ValueError("required Windows render validation is missing or belongs to another source commit")
+        if validation.get("generated_native_ffx_case_count", 0) < 15 or validation.get("generated_fixtures_authored_by_after_effects") is not False:
+            raise ValueError("native FFX matrix is incomplete or its provenance is incorrect")
         subprocess.run(["git", "merge-base", "--is-ancestor", COMPATIBILITY, sha], cwd=root, check=True)
         version_info = {}
         if not options.skip_native_smoke:
@@ -114,7 +116,7 @@ def main():
                 raise ValueError("Windows executable resources do not carry the CortezEffects identity")
         build = {"product": "CortezEffects", "windows_version_info": version_info, "source_commit": sha, "preserved_compatibility_commit": COMPATIBILITY, "target": options.target,
                  "rust": command(root, "rustc", "+1.95.0", "--version"), "native_cli_smoke_passed": not options.skip_native_smoke,
-                 "windows_11_gui_tested": False, "ffx_supported": "partial-mapped-properties", "aepx_supported": False, "aex_runtime_supported": "experimental-cpu-smart-render-float-sliders",
+                 "windows_11_gui_tested": False, "ffx_supported": "partial-typed-native-effects-and-transforms", "aepx_supported": False, "aex_runtime_supported": "experimental-cpu-smart-render-float-sliders",
                  "native_validation": validation,
                  "executables": {name: {"bytes": path.stat().st_size, "sha256": digest(path)} for name, path in executable_paths.items()}}
         (out / "build.json").write_text(json.dumps(build, indent=2) + "\n", encoding="utf-8")
@@ -122,12 +124,18 @@ def main():
         sapphire_report = (root / "packaging/after-effects/RELATORIO-S_Shake.md").read_bytes()
         (out / "SAPPHIRE-S_SHAKE.md").write_bytes(sapphire_report)
         delivery = (f"\n\n## Identificação da compilação Windows\n\nCommit: `{sha}`. Alvo: `{options.target}`.\n\n"
-                    f"Destino de publicação configurado no workflow: https://github.com/simoescortez1-star/effectcraft/releases/tag/cortezeffects-glass-{sha[:12]}\n\n"
+                    f"Destino de publicação configurado no workflow: https://github.com/simoescortez1-star/effectcraft/releases/tag/cortezeffects-ffx-{sha[:12]}\n\n"
                     "O endereço é publicado após o sucesso do pacote e sua disponibilidade é verificada na entrega.\n\n"
                     f"Validação automatizada desta compilação:\n\n```json\n{json.dumps(validation, indent=2)}\n```\n"
                     "\nWindows 11 com interação manual: não testado. Sapphire comercial: compatibilidade não comprovada.\n")
-        (out / "RELATORIO.md").write_bytes((root / "docs/cortezeffects-redesign.md").read_bytes() + delivery.encode("utf-8"))
-        readme = """CORTEZEFFECTS - LIQUID GLASS - EDICAO EXPERIMENTAL
+        (out / "RELATORIO.md").write_bytes((root / "docs/ffx-native-effects.md").read_bytes() + delivery.encode("utf-8"))
+        readme = """CORTEZEFFECTS - FFX NATIVE EFFECTS - EDICAO EXPERIMENTAL
+FFX: caminhos em lote e relogios por propriedade corrigidos; Warp, Motion Tile, Tint e Gaussian mapeados por IDs.
+Outros efeitos nativos permitem resolucao experimental por declaracoes salvas e tipos compativeis.
+Animacao > Aplicar preset do After Effects aplica a camada selecionada no tempo atual.
+O relatorio possui Exportar JSON, com arvore original, valores, curvas e propriedades atuais da camada.
+Dados desconhecidos e expressoes sao preservados; expressoes importadas permanecem desativadas.
+FFX nativo parcial: nao e compatibilidade visual completa com After Effects.
 Abra CortezEffects.exe ou Launch.cmd. Interface: Aparencia e personalizacao pelo botao de brilho no topo.
 Cinco temas, cores de destaque, controles de vidro, wallpaper PNG/JPEG, fontes e movimento reduzido.
 As preferencias e projetos antigos sao mantidos; a pasta de dados continua EffectCraftData por compatibilidade.
@@ -137,7 +145,8 @@ Pacote portatil: nao requer MSI nem privilegios de administrador. Nao inclui plu
 AEP e FFX usam o conversor separado incluido. Suporte parcial; AEPX ainda indisponivel.
 FFX: propriedades reconhecidas sao aplicadas; efeitos indisponiveis ficam preservados como dados.
 Scale em tdbs direto e clocks salvos agora sao lidos. A timeline revela as propriedades aplicadas.
-No Scale anexado, as chaves ficam 38/60 s e 53/60 s apos o tempo atual; intervalo de 0,25 s.
+Historico: no Scale simples da etapa anterior, as chaves ficam 38/60 s e 53/60 s apos o tempo atual.
+Os novos presets Warp e Scale + Motion Tile sao detalhados em RELATORIO.md, com seus valores e tempos reais.
 O preset S_Shake enviado ainda exige um runtime Sapphire validado; nao ha substituicao visual.
 Novo: effectcraft-aex-diagnostic.exe e Diagnosticar-Sapphire.cmd produzem log JSON local.
 Abra Diagnosticar-Sapphire.cmd para testar o Gain e os modulos cujo PiPL declara S_Shake.
@@ -190,6 +199,7 @@ Os executaveis experimentais nao possuem assinatura de codigo.
                         archive.write(path, f"colored-{colored['version']}/" + path.relative_to(source_root).as_posix())
             package.writestr("native-worker-notices/colored-source.zip", source_zip.getvalue())
             package.write(root / "docs/after-effects-compatibility.md", "ARCHITECTURE-AND-COMPATIBILITY.md")
+            package.write(root / "docs/cortezeffects-redesign.md", "CORTEZEFFECTS-REDESIGN.md")
             package.write(root / "packaging/windows/portable.txt", "portable.txt")
             for path in (root / "assets/cortezeffects").iterdir():
                 if path.is_file():

@@ -159,6 +159,8 @@ impl<'a> EvalCtx<'a> {
         let three = layer.is_3d();
         let pos = self.position(layer, tr);
         let rz = self.f(layer, tr, "rotation", 0.0);
+        let skew = self.f(layer, tr, "skew", 0.0).clamp(-85.0, 85.0);
+        let skew_axis = self.f(layer, tr, "skewAxis", 0.0);
         if layer.is_camera() || layer.is_light() {
             // Children of cameras/lights follow their position and full rotation.
             return Mat4::translate(Vec3::from(pos)) * crate::three_d::camera::rig_rotation(self, layer);
@@ -171,6 +173,13 @@ impl<'a> EvalCtx<'a> {
             let a = Vec3::from([anchor[0], anchor[1], 0.0]);
             let p = Vec3::from([pos[0], pos[1], 0.0]);
             let rz = rz + crate::three_d::camera::auto_orient_2d(self, layer);
+            if skew != 0.0 {
+                return Mat4::translate(p)
+                    * Mat4::rotate_z(rz)
+                    * Mat4::from_mat3_affine(&Mat3::skew_deg(-skew, skew_axis))
+                    * Mat4::scale(Vec3::from(scale) / 100.0)
+                    * Mat4::translate(-a);
+            }
             return Mat4::layer_3d(a, p, Vec3::from(scale), Vec3::ZERO, vec3(0.0, 0.0, rz));
         }
         let rx = self.f(layer, tr, "rotationX", 0.0);
@@ -179,13 +188,9 @@ impl<'a> EvalCtx<'a> {
         // Auto-orient (along path / towards camera) replaces Orientation.
         let orient = crate::three_d::camera::auto_orient_3d(self, layer, p)
             .unwrap_or_else(|| Mat4::orientation(Vec3::from(self.v3(layer, tr, "orientation", [0.0; 3]))));
-        Mat4::translate(p)
-            * orient
-            * Mat4::rotate_z(rz)
-            * Mat4::rotate_y(ry)
-            * Mat4::rotate_x(rx)
-            * Mat4::scale(Vec3::from(scale) / 100.0)
-            * Mat4::translate(-Vec3::from(anchor))
+        let rotation = Mat4::translate(p) * orient * Mat4::rotate_z(rz) * Mat4::rotate_y(ry) * Mat4::rotate_x(rx);
+        let rotation = if skew == 0.0 { rotation } else { rotation * Mat4::from_mat3_affine(&Mat3::skew_deg(-skew, skew_axis)) };
+        rotation * Mat4::scale(Vec3::from(scale) / 100.0) * Mat4::translate(-Vec3::from(anchor))
     }
 
     /// Layer space → comp (world) space, including parents.

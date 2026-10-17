@@ -1,8 +1,8 @@
-name: Build downloadable CortezEffects Windows edition
+name: Build downloadable CortezEffects FFX native edition
 
 on:
   push:
-    branches: [feat/after-effects-compatibility, feat/ae-advanced-compatibility, feat/cortezeffects-liquid-glass]
+    branches: [feat/after-effects-compatibility, feat/ae-advanced-compatibility, feat/cortezeffects-liquid-glass, feat/ffx-native-effects]
   workflow_dispatch:
 
 permissions:
@@ -48,6 +48,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Bridge tests failed' }
           cargo test --locked --release --target x86_64-pc-windows-msvc -p effectcraft-engine --lib after_effects
           if ($LASTEXITCODE -ne 0) { throw 'Engine integration tests failed' }
+          cargo test --locked --release --target x86_64-pc-windows-msvc -p effectcraft-engine --lib ffx
+          if ($LASTEXITCODE -ne 0) { throw 'FFX carrier and ID regression tests failed' }
       - name: Build and test the pinned separate converter
         run: python packaging/after-effects/bootstrap_converter.py --work "$env:AEP_WORK" --lock-file packaging/after-effects/converter-Cargo.lock --target x86_64-pc-windows-msvc --release
       - uses: dtolnay/rust-toolchain@1.99.0
@@ -56,7 +58,7 @@ jobs:
       - name: Test CortezEffects personalization and window geometry on Windows
         shell: pwsh
         run: |
-          cargo +1.95.0 test --locked --release --target x86_64-pc-windows-msvc -p effectcraft-ui-egui --test ui_personalization --test ui_theme_favorites --test ui_panels --test ui_presets_folder --test ui_settings_info
+          cargo +1.95.0 test --locked --release --target x86_64-pc-windows-msvc -p effectcraft-ui-egui --test ui_personalization --test ui_theme_favorites --test ui_panels --test ui_presets_folder --test ui_settings_info --test ui_after_effects --test ui_keyframes
           if ($LASTEXITCODE -ne 0) { throw 'Personalization tests failed' }
           cargo +1.95.0 test --locked --release --target x86_64-pc-windows-msvc -p effectcraft --bin effectcraft window::tests
           if ($LASTEXITCODE -ne 0) { throw 'Window geometry tests failed' }
@@ -81,7 +83,7 @@ jobs:
 
   release:
     needs: windows
-    if: github.repository == 'simoescortez1-star/effectcraft' && (github.ref == 'refs/heads/feat/after-effects-compatibility' || github.ref == 'refs/heads/feat/ae-advanced-compatibility' || github.ref == 'refs/heads/feat/cortezeffects-liquid-glass')
+    if: github.repository == 'simoescortez1-star/effectcraft' && (github.ref == 'refs/heads/feat/after-effects-compatibility' || github.ref == 'refs/heads/feat/ae-advanced-compatibility' || github.ref == 'refs/heads/feat/cortezeffects-liquid-glass' || github.ref == 'refs/heads/feat/ffx-native-effects')
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -98,8 +100,8 @@ jobs:
         run: |
           cd packages
           sha256sum --check SHA256SUMS.txt
-          gh release create "cortezeffects-glass-${BUILD_SHA:0:12}" --target "$BUILD_SHA" \
-            --prerelease --title "CortezEffects Liquid Glass experimental ${BUILD_SHA:0:12}" \
+          gh release create "cortezeffects-ffx-${BUILD_SHA:0:12}" --target "$BUILD_SHA" \
+            --prerelease --title "CortezEffects FFX native experimental ${BUILD_SHA:0:12}" \
             --notes-file LEIA-ME.txt \
             CortezEffects-Windows-x64.zip CortezEffects-source.zip \
             RELATORIO.md SAPPHIRE-S_SHAKE.md build.json CLI-SMOKE.txt SHA256SUMS.txt LEIA-ME.txt

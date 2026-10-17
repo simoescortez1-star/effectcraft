@@ -43,7 +43,9 @@ def apply(checkout):
     path.write_text(path.read_text(encoding="utf-8") + "\nmod effectcraft_compat;\npub use effectcraft_compat::effectcraft_preset;\n", encoding="utf-8")
     manifest = checkout / "examples/effectcraft/Cargo.toml"
     text = manifest.read_text(encoding="utf-8")
-    manifest.write_text(text.replace('aep-reader = { path = "../.." }', 'aep-reader = { path = "../..", features = ["serde"] }'), encoding="utf-8")
+    text = text.replace('aep-reader = { path = "../.." }', 'aep-reader = { path = "../..", features = ["serde"] }')
+    text = text.replace('[lints.rust]', f'effectcraft-effects = {{ path = "{(here.parents[2] / "crates/effects").as_posix()}" }}\n\n[lints.rust]')
+    manifest.write_text(text, encoding="utf-8")
     adapter = checkout / "examples/effectcraft/src/lib.rs"
     text = adapter.read_text(encoding="utf-8")
     anchor = 'pub fn import_with_options(bytes: &[u8], options: ImportOptions) -> Result<Import> {'
@@ -53,7 +55,7 @@ def apply(checkout):
     anchor = '    let factor = match match_name {'
     if text.count(anchor) != 1:
         raise RuntimeError("pinned property mapping clock anchor changed")
-    text = text.replace(anchor, '    let ticks = source.source_ticks_per_second.unwrap_or(ticks);\n' + anchor)
+    text = text.replace(anchor, '    let ticks = source.source_ticks_per_second.unwrap_or(ticks);\n    target.spatial = source.spatial;\n' + anchor)
     # AE saves 2D Position/Anchor/Scale vectors as two components in some presets.
     # Keep the target's existing third component instead of rejecting the vector.
     anchor = '        ([x, y, z], Value::Vec3(_)) => Ok(Value::Vec3([*x, *y, *z])),'
@@ -86,15 +88,19 @@ def apply(checkout):
                 let mode = |code, handles: &[effectcraft_keyframe::Ease]| match code {
                     1 => effectcraft_keyframe::Interp::Linear,
                     2 if !handles.is_empty() => effectcraft_keyframe::Interp::Bezier,
+                    3 => effectcraft_keyframe::Interp::Hold,
                     _ => effectcraft_keyframe::Interp::Linear,
                 };
                 mapped.in_interp = mode(key.in_interpolation, &mapped.in_ease);
                 mapped.out_interp = mode(key.out_interpolation, &mapped.out_ease);
                 if key.in_interpolation != 1 || key.out_interpolation != 1 {
-                    report.warn(context, format!("Interpolation codes {}/{} at tick {}: code 2 with valid saved handles mapped to Bezier experimentally; other unknown codes use linear. AE visual equivalence is unverified.", key.in_interpolation, key.out_interpolation, key.time_ticks));
+                    report.warn(context, format!("Interpolation codes {}/{} at tick {}: code 2 with valid saved handles mapped to Bezier experimentally; code 3 mapped to Hold experimentally; other unknown codes use linear with this warning. AE visual equivalence is unverified; raw curves are preserved.", key.in_interpolation, key.out_interpolation, key.time_ticks));
                 }''')
     adapter.write_text(text + "\nmod effectcraft_compat;\n", encoding="utf-8")
     shutil.copyfile(here / "adapter_compat.rs", adapter.parent / "effectcraft_compat.rs")
+    shutil.copyfile(here / "native_effects.rs", adapter.parent / "effectcraft_native_effects.rs")
+    with adapter.open("a", encoding="utf-8") as f:
+        f.write("\nmod effectcraft_native_effects;\n")
     shutil.copyfile(here / "preset_reader_tests.rs", adapter.parent.parent / "tests/preset_reader.rs")
     # Upstream asserts the former linear fallback. Keep its time/value regression
     # and update the expected diagnostic for this edition's explicit Bezier map.

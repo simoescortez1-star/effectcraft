@@ -86,6 +86,9 @@ fn warp(e: &mut Enc, ctx: &EffectCtx, mut b: GBuf) -> Option<GBuf> {
     let k = ctx.params.f("bend") / 100.0;
     let hd = ctx.params.f("horizontalDistortion") / 100.0;
     let vd = ctx.params.f("verticalDistortion") / 100.0;
+    if [k, hd, vd].iter().any(|v| !v.is_finite()) {
+        return Some(b);
+    }
     if k == 0.0 && hd == 0.0 && vd == 0.0 {
         return Some(b);
     }
@@ -94,7 +97,13 @@ fn warp(e: &mut Enc, ctx: &EffectCtx, mut b: GBuf) -> Option<GBuf> {
     let (hx, hy) = (ctx.layer_size[0] * b.scale * 0.5, ctx.layer_size[1] * b.scale * 0.5);
     if !ctx.adjustment {
         let pad = ((k.abs() + hd.abs() + vd.abs()) * 0.6 * hx.max(hy)).ceil().min(4096.0);
-        b.pad(e, pad as u32 + 1)?;
+        let pad = pad as u32 + 1;
+        let size = b.img.width.checked_add(pad.saturating_mul(2)).zip(b.img.height.checked_add(pad.saturating_mul(2)));
+        if !size.is_some_and(|(w, h)| effectcraft_effects::geometry_effect_extent_supported(w, h)) {
+            log::warn!("Warp output exceeds supported geometry; input pixels preserved");
+            return Some(b);
+        }
+        b.pad(e, pad)?;
     }
     // Fisheye / Twist (a crease at the unit circle) bent past 50 % or with Horizontal /
     // Vertical Distortion: Newton's inverse wanders chaotically before converging near the

@@ -644,6 +644,10 @@ fn motion_tile(e: &mut Enc, ctx: &EffectCtx, b: GBuf) -> Option<GBuf> {
         let oh = (lh * ctx.params.f("outputHeight") / 100.0).max(1.0 / s);
         ((ow * s).round().max(1.0) as u32, (oh * s).round().max(1.0) as u32, [(ow - lw) * 0.5 * s, (oh - lh) * 0.5 * s])
     };
+    if !effectcraft_effects::geometry_effect_extent_supported(nw, nh) || noff.iter().any(|v| !v.is_finite()) {
+        log::warn!("Motion Tile output exceeds supported geometry; input pixels preserved");
+        return Some(b);
+    }
     if !e.g.fits(nw, nh) {
         return None;
     }

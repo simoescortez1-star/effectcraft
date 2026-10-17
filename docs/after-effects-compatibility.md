@@ -7,6 +7,8 @@ records the measured user fixtures, validation requirements and remaining limita
 The newer [S_Shake analysis and local diagnostic guide](../packaging/after-effects/RELATORIO-S_Shake.md)
 records the actual preset values, two Amplitude keys, reference-video measurements and
 the remaining block on native Sapphire preset application. It does not claim compatibility.
+The [native FFX investigation and report](ffx-native-effects.md) documents the later queued-path,
+per-property-clock, typed Warp/Motion Tile/Tint/Gaussian mappings and partial native registry.
 
 ## Architecture and provenance
 
@@ -38,7 +40,8 @@ library is linked into the editor.
 
 The [original Release](https://github.com/simoescortez1-star/effectcraft/releases/tag/ae-compat-e30d8d6d)
 remains available. Each successful native delivery workflow publishes a separate prerelease
-`ae-native-<commit>`. Inspect the actual Actions result and `build.json`; the presence of a
+`ae-native-<commit>` for that stage. The later CortezEffects native-FFX workflow uses
+`cortezeffects-ffx-<commit>`. Inspect the actual Actions result and `build.json`; the presence of a
 workflow alone is not validation. Extract the complete portable ZIP and start `Launch.cmd`.
 No commercial plugins or MSI installer are included.
 The ZIP now includes `effectcraft-aex-diagnostic.exe` and `Diagnosticar-Sapphire.cmd`.
@@ -94,10 +97,15 @@ still require **Replace Footage → File**. Existing interpretation and sequence
 The FaFX parser extracts named settings blocks without executing expressions. Properties
 support both direct `tdbs` storage and the `sspc` envelope, including nested
 `tdsi` match-name paths and end-of-path markers. Display names do not select mappings.
-Saved nonzero `beso`/`tdb4` clock fields must agree; conflicting clocks reject the preset.
+Queued paths bind to their corresponding settings blocks in saved order. Each numeric property's
+nonzero `tdb4` rate controls its own keys; its rate may differ from the saved `beso` container rate.
+Conflicting declarations of the same container clock still reject the preset.
 The uploaded Scale regression uses 30720 ticks/s, rather than the former fixed 8000.
 The engine also reveals applied properties in the timeline and reports actual property/key counts.
-Recognized transform properties and the existing narrow Gaussian mapper supply a carrier project.
+Recognized transforms and the central typed native-effect registry supply a carrier project.
+Explicit bindings cover Warp, Motion Tile, Tint and Gaussian. Other allowlisted native effects
+may resolve compatible controls through their own saved parameter declarations, with experimental
+status; custom, localized or ambiguous declarations remain unmapped. See the native FFX report.
 Two-component vectors retain the target's third component when mapped to a Vec3 property.
 The engine applies only the explicit property map/effect groups, shifts keys to each target
 layer's current time, assigns fresh IDs and supports undo/redo and reopening. Selection is
@@ -180,5 +188,6 @@ multiple times, worker exit/recovery, disable, undo, persistence) before deliver
 
 The standard CI headless environment may skip GPU comparisons without an adapter.
 An earlier independent Mesa/llvmpipe run had 210 passes and two existing failures:
-HexTile and ThresholdRGB. No shader changes are made here. Neither CI nor the Gain CPU
+HexTile and ThresholdRGB. That AEX stage made no shader changes; the later native-FFX stage
+changes Motion Tile border sampling and geometry bounds on both CPU/GPU paths. Neither CI nor the Gain CPU
 fixture establishes Windows GPU compatibility or AE visual equivalence.
