@@ -242,3 +242,10 @@ across launches).
 By default the log has `info` records from EffectCraft and warnings and errors from everything
 else. `RUST_LOG` replaces that with env_logger-style directives: `debug`,
 `warn,effectcraft_render=trace`, `wgpu_core=info`. The control-channel token is never logged.
+
+
+## Quick Effects Console (CortezEffects)
+
+A página `quickEffects` configura abertura, resultados, favoritos, recentes,
+aparência, pasta adicional de presets e captura de frame. O atalho usa o editor
+existente e `shortcuts.json`. Veja [funcionalidades e limites](quick-effects-console.md).

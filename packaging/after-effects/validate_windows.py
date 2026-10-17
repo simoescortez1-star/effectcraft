@@ -29,12 +29,31 @@ def main():
                EFFECTCRAFT_AEX_WORKER=str(native / "effectcraft-aex-worker.exe"),
                EFFECTCRAFT_TEST_FFX=str(out / "opacity.ffx"), EFFECTCRAFT_TEST_AEX=str(plugin))
     results = {}
-    for module, test in [("tests_after_effects", "ffx_external_generated_end_to_end"),
-                         ("tests_after_effects", "ffx_direct_transform_presets_render_and_preserve_saved_timebase"),
-                         ("tests_ffx_native", "generated_native_ffx_cases_apply_render_export_persist_and_undo"),
-                         ("tests_after_effects", "aex_native_worker_renders_and_recovers_after_child_exit")]:
+    ui_log_path = Path(os.environ["RUNNER_TEMP"]) / "quick-effects-ui.txt"
+    ui_log = ui_log_path.read_text(encoding="utf-8-sig", errors="replace")
+    ui_cases = [
+        "ctrl_space_search_enter_applies_real_pixels_and_one_undo_redo_from_timeline_and_viewer",
+        "arrows_select_current_results_escape_releases_focus_and_empty_selection_is_safe",
+        "favorites_aliases_frequency_settings_and_custom_shortcut_survive_reload",
+        "native_user_and_builtin_presets_use_existing_commands",
+        "capture_png_and_clipboard_commands_render_the_composition",
+        "console_respects_themes_dpi_settings_and_ime_composition",
+        "configured_capture_folder_uses_scale_and_distinct_names_and_rejects_oversized_capture_before_rendering",
+        "native_preset_reports_unavailable_effects_and_does_not_claim_empty_presets_were_applied",
+    ]
+    if "FAILED" in ui_log or not all(f"test {name} ... ok" in ui_log for name in ui_cases):
+        raise RuntimeError("required Quick Effects UI regressions did not pass on this Windows build")
+    (out / "quick-effects-ui.txt").write_text(ui_log, encoding="utf-8")
+    results["quick_effects_console_ui"] = True
+    results["quick_effects_console_ui_cases"] = len(ui_cases)
+
+    for crate, module, test in [("effectcraft-engine", "tests_after_effects", "ffx_external_generated_end_to_end"),
+                         ("effectcraft-engine", "tests_after_effects", "ffx_direct_transform_presets_render_and_preserve_saved_timebase"),
+                         ("effectcraft-engine", "tests_ffx_native", "generated_native_ffx_cases_apply_render_export_persist_and_undo"),
+                         ("effectcraft-engine", "tests_after_effects", "aex_native_worker_renders_and_recovers_after_child_exit"),
+                         ("effectcraft-ui-egui", None, "ffx_console_uses_existing_importer_and_preserves_its_diagnostics")]:
         result = subprocess.run(["cargo", "+1.95.0", "test", "--locked", "--release", "--target", "x86_64-pc-windows-msvc",
-                                 "-p", "effectcraft-engine", "--lib", f"{module}::{test}", "--", "--ignored", "--exact", "--nocapture"],
+                                 "-p", crate, *(["--lib", f"{module}::{test}"] if module else ["--test", "ui_quick_effects", test]), "--", "--ignored", "--exact", "--nocapture"],
                                 cwd=root, env=env, text=True, encoding="utf-8", capture_output=True, errors="replace", timeout=900)
         log = result.stdout + result.stderr
         (out / f"{test}.txt").write_text(log, encoding="utf-8")

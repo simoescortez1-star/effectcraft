@@ -13,6 +13,22 @@ pub(crate) struct Backdrop {
 }
 
 impl Backdrop {
+    /// Reuse the already blurred wallpaper texture; never read back the viewport for a popup.
+    pub(crate) fn console_slice(&self, viewport: Rect, rect: Rect, a: &effectcraft_engine::prefs::Appearance) -> Option<egui::Shape> {
+        let texture = self.texture.as_ref()?;
+        let size = texture.size().map(|value| value.max(1) as f32);
+        let (target, uv) = wallpaper_rect(viewport, vec2(size[0], size[1]), &a.wallpaper_fit);
+        let visible = rect.intersect(target);
+        if !visible.is_positive() || !target.is_positive() {
+            return None;
+        }
+        let low = uv.min + ((visible.min - target.min) / target.size()) * uv.size();
+        let high = uv.min + ((visible.max - target.min) / target.size()) * uv.size();
+        let mut mesh = egui::Mesh::with_texture(texture.id());
+        mesh.add_rect_with_uv(visible, Rect::from_min_max(low, high), Color32::WHITE.gamma_multiply((a.wallpaper_opacity as f32 * 0.18).clamp(0.0, 0.18)));
+        Some(egui::Shape::mesh(mesh))
+    }
+
     pub fn paint(&mut self, ui: &egui::Ui, rect: Rect, a: &effectcraft_engine::prefs::Appearance, t: &Tokens, busy: bool) -> Option<String> {
         let painter = ui.painter().with_clip_rect(rect);
         painter.rect_filled(rect, 0.0, t.app_bg);

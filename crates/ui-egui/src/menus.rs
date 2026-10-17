@@ -27,6 +27,17 @@ macro_rules! uic {
 
 /// UI-only commands (not in the AE menus; shortcuts and the command palette).
 pub const UI_COMMANDS: &[UiCommand] = &[
+    uic!("quickEffects.close", "Close Quick Effects Console", [], None),
+    uic!("quickEffects.open", "Quick Effects Console", [], Some("Ctrl+Space")),
+    uic!("quickEffects.importFfx", "Apply an FFX from Console", [], None),
+    uic!("quickEffects.refresh", "Refresh Quick Effects Console", [], None),
+    uic!("quickEffects.results", "Search Quick Effects Console", [], None),
+    uic!("quickEffects.apply", "Apply Console Selection", [], None),
+    uic!("quickEffects.favorite", "Toggle Console Favorite", [], None),
+    uic!("quickEffects.alias", "Set Console Search Alias", [], None),
+    uic!("quickEffects.shortcut", "Configure Console Shortcuts", [], None),
+    uic!("quickEffects.capture", "Console: Capture PNG", [], None),
+    uic!("quickEffects.copyFrame", "Console: Capture to Clipboard", [], None),
     uic!("window.dockAction", "Docking Action", [], None),
     uic!("playback.ramPreview", "Preview (Numpad 0)", [], Some("Num0")),
     uic!("playback.preview.shiftSpacebar", "Preview (Shift+Spacebar)", [], Some("Shift+Space")),
@@ -291,6 +302,9 @@ fn only_comp(p: &Value) -> Option<effectcraft_engine::project::ItemId> {
 
 /// Execute a UI or engine command by id.
 pub fn invoke(app: &mut EffectcraftApp, ctx: &egui::Context, id: &str, params: Value) -> Result<Value, String> {
+    if id.starts_with("quickEffects.") {
+        return crate::panels::quick_effects::command(app, ctx, id, params);
+    }
     if id == "effects.copyPresetsFolderPath" {
         return frontend(app, ctx, id, params);
     }
@@ -1782,6 +1796,12 @@ pub fn handle_tab_shortcut(app: &mut EffectcraftApp, ctx: &egui::Context) {
 
 fn handle_shortcuts_impl(app: &mut EffectcraftApp, ctx: &egui::Context, tab_only: bool) {
     let start = modifiers_at_start(ctx);
+    if !tab_only && app.dialog == Some(crate::Dialog::QuickEffects) && ctx.input(|input| input.key_pressed(egui::Key::Escape)) {
+        ctx.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Escape));
+        crate::panels::quick_effects::close(app, ctx);
+        return;
+    }
+
     // Dialog cancellation owns Escape even when a text field has keyboard focus.
     if !tab_only && app.dialog.is_some() && ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
         // A popup or colour picker takes Escape first (the picker goes back to its original colour).

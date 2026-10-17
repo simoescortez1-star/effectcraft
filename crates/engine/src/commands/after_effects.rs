@@ -474,6 +474,9 @@ fn apply_preset(s: &mut Session, p: &Value) -> Result<Value> {
         command: "app.showReport".into(),
         params: json!({"title":"After Effects Preset Report","text":details,"summary":format!("{filename}\n{summary}\n{}",effectcraft_ae_bridge::warning_summary(&warnings)),"json":result}),
     });
+    s.prefs.push_recent_preset(path);
+    s.prefs_changed();
+    s.save_prefs();
     Ok(result)
 }
 

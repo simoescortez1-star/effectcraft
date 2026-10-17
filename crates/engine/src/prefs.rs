@@ -424,6 +424,7 @@ pub struct Prefs {
     pub composition: CompositionPrefs,
     pub previews: Previews,
     pub appearance: Appearance,
+    pub quick_effects: crate::quick_effects::Preferences,
     pub grids: Grids,
     /// The 16 labels (Red … Dark Green), in order.
     pub labels: Vec<LabelPref>,
@@ -473,6 +474,7 @@ impl Default for Prefs {
             composition: CompositionPrefs::default(),
             previews: Previews::default(),
             appearance: Appearance::default(),
+            quick_effects: Default::default(),
             grids: Grids::default(),
             labels: default_labels(),
             type_: TypePrefs::default(),
@@ -618,6 +620,7 @@ impl Prefs {
     /// Clamp values into their valid ranges and fill missing labels.
     pub fn normalize(&mut self) {
         self.version = PREFS_VERSION;
+        self.quick_effects.normalize();
         self.comp_presets.retain(CompPreset::is_valid);
         if !is_choice(WINDOW_GRAPHICS, &self.startup.window_graphics) {
             self.startup.window_graphics = Startup::default().window_graphics;
@@ -1028,6 +1031,7 @@ pub fn section_key(page: &str) -> Option<&'static str> {
         "composition" | "display" => "composition",
         "previews" => "previews",
         "appearance" => "appearance",
+        "quickEffects" => "quickEffects",
         "grids" => "grids",
         "labels" => "labels",
         "type" => "type",
@@ -1056,6 +1060,7 @@ pub fn page_id(name: &str) -> Option<&'static str> {
         "composition" | "display" => "composition",
         "previews" | "preview" => "previews",
         "appearance" => "appearance",
+        "quickeffects" | "quickeffectsconsole" => "quickEffects",
         "grids" | "gridsguides" => "grids",
         "labels" => "labels",
         "type" => "type",
@@ -1271,6 +1276,29 @@ pub fn pages() -> Vec<Page> {
                 s("previews.zoomQuality", "Viewer Zoom Quality", Kind::Choice(&[("Faster", "faster"), ("More Accurate", "moreAccurate")]), true),
                 s("previews.displayProfile", "Display Color Space", Kind::Choice(&[("sRGB", "srgb"), ("Display P3", "p3")]), true),
                 Button { label: "GPU Information...", command: "app.gpuInfo", params: "{}" },
+            ],
+        },
+        Page {
+            id: "quickEffects",
+            title: "Quick Effects Console",
+            items: vec![
+                s("quickEffects.enabled", "Enable Quick Effects Console", B, true),
+                Button { label: "Customize Console Shortcut…", command: "quickEffects.shortcut", params: "{}" },
+                Note("The shortcut is local to CortezEffects. Use Keyboard Shortcuts to resolve conflicts or assign favorite effects."),
+                s("quickEffects.maxResults", "Maximum Results", Kind::Int(4, 30, ""), true),
+                s("quickEffects.favoritesFirst", "Favorites First", B, true),
+                s("quickEffects.showRecent", "Show Recent Effects and Presets", B, true),
+                s("quickEffects.animations", "Animate Console Opening", B, true),
+                s("quickEffects.opacity", "Console Opacity", Kind::Slider(0.75, 1.0), true),
+                s("quickEffects.width", "Console Width", Kind::Int(360, 900, "px"), true),
+                Section("Presets"),
+                s("quickEffects.presetFolder", "Additional Presets Folder", Kind::Path, true),
+                Note("Indexes .ecpreset and .ffx files without parsing them. FFX compatibility is checked by the existing importer when applied."),
+                Section("Frame Capture"),
+                s("quickEffects.screenshotFolder", "Screenshot Folder", Kind::Path, true),
+                s("quickEffects.screenshotScale", "Screenshot Scale", Kind::Slider(0.25, 1.0), true),
+                Note("An empty folder asks where to save the PNG. Captures use the composition renderer, not the editor window."),
+                Button { label: "Configure Capture Shortcuts…", command: "quickEffects.shortcut", params: "{\"capture\":true}" },
             ],
         },
         Page {

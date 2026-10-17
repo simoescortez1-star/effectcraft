@@ -1,5 +1,8 @@
 <h1 align="center">CortezEffects</h1>
 
+Quick Effects Console nativo: **Ctrl + Espaço** para buscar e aplicar efeitos. [Funcionalidades, atalhos e testes](docs/quick-effects-console.md).
+
+
 Native FFX work: [measured Warp / Scale + Motion Tile report](docs/ffx-native-effects.md), typed
 effect bindings, per-property clocks and preserved diagnostics. Compatibility remains partial.
 

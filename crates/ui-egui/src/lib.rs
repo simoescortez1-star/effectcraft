@@ -62,6 +62,7 @@ pub enum Dialog {
     CompSettings,
     SolidSettings,
     CommandPalette,
+    QuickEffects,
     /// Settings (Preferences) on `dialog_state.settings_page`.
     Settings,
     /// Edit ▸ Keyboard Shortcuts.
@@ -324,6 +325,7 @@ pub struct EffectcraftApp {
     pub(crate) dialog_state: panels::dialogs::DialogState,
     pub integrated_titlebar: bool,
     backdrop: glass::Backdrop,
+    pub(crate) quick_console: panels::quick_effects::State,
     /// Audio preview while playing (audio clock drives playback).
     pub audio: Option<audio::AudioPlayback>,
     /// Audio scrubbing's open output (Ctrl/Cmd-drag the current time, `playback.scrubAudio`).
@@ -415,6 +417,7 @@ impl EffectcraftApp {
             dialog_state: Default::default(),
             integrated_titlebar: false,
             backdrop: glass::Backdrop::default(),
+            quick_console: Default::default(),
             audio: None,
             scrub: None,
             meter: Default::default(),

@@ -33,6 +33,7 @@ pub mod perf;
 pub mod prefs;
 pub mod preview;
 pub mod psd_import;
+pub mod quick_effects;
 pub mod remote;
 pub mod render_queue;
 pub mod roto;

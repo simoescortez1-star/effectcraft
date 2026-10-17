@@ -244,6 +244,7 @@ pub fn show(app: &mut EffectcraftApp, ctx: &egui::Context) {
         Dialog::NewComp | Dialog::CompSettings => comp_settings(app, ctx, &t, d == Dialog::CompSettings),
         Dialog::SolidSettings => solid(app, ctx, &t),
         Dialog::CommandPalette => palette(app, ctx, &t),
+        Dialog::QuickEffects => super::quick_effects::show(app, ctx),
         Dialog::Settings => super::settings::show(app, ctx, &t),
         Dialog::Shortcuts => super::shortcut_editor::show(app, ctx, &t),
         Dialog::Recovery => super::settings::recovery(app, ctx, &t),

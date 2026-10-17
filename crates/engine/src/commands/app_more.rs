@@ -111,7 +111,12 @@ fn apply_recent_preset(s: &mut Session, p: &Value) -> Result<Value> {
     if let Some(l) = p.get("layers") {
         q["layers"] = l.clone();
     }
-    s.execute("anim.applyPreset", q)
+    let command = if std::path::Path::new(&path).extension().is_some_and(|extension| extension.eq_ignore_ascii_case("ffx")) {
+        "anim.applyAfterEffectsPreset"
+    } else {
+        "anim.applyPreset"
+    };
+    s.execute(command, q)
 }
 
 fn has_recent_presets(s: &Session) -> std::result::Result<(), String> {

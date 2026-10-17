@@ -74,7 +74,7 @@ pub fn depth_keeps(depth: &str, e: &effectcraft_engine::effects::EffectSpec) -> 
     }
 }
 
-fn filled_star(p: &egui::Painter, c: egui::Pos2, r: f32, fill: Option<Color32>, stroke: Color32) {
+pub(super) fn filled_star(p: &egui::Painter, c: egui::Pos2, r: f32, fill: Option<Color32>, stroke: Color32) {
     let pts: Vec<egui::Pos2> = (0..10)
         .map(|i| {
             let a = std::f32::consts::PI * i as f32 / 5.0 - std::f32::consts::FRAC_PI_2;
@@ -194,7 +194,7 @@ fn effect_row(
     }
     app.auto.add(&format!("{auto_prefix}.{}", e.id), r, e.name);
     // Favourite star (always shown when starred, else on hover).
-    let fav = app.ui.effects_favorites.contains(e.id);
+    let fav = super::quick_effects::is_favorite(app, e.id);
     let sresp = ui.interact(star.intersect(list), egui::Id::new((auto_prefix, e.id, "star")), Sense::click());
     if fav || resp.hovered() || sresp.hovered() {
         let gold = Color32::from_rgb(0xe8, 0xc0, 0x40);
@@ -202,11 +202,7 @@ fn effect_row(
     }
     app.auto.add(&format!("{auto_prefix}.{}.star", e.id), star, if fav { "Remove from Favorites" } else { "Add to Favorites" });
     if sresp.clicked() {
-        if fav {
-            app.ui.effects_favorites.remove(e.id);
-        } else {
-            app.ui.effects_favorites.insert(e.id.to_string());
-        }
+        super::quick_effects::favorite(app, &format!("effect:{}", e.id));
         return;
     }
     if resp.double_clicked() {
@@ -362,7 +358,7 @@ pub fn show(app: &mut EffectcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let lookup = |id: &str| reg.iter().find(|e| e.id == id);
 
     // Favorites and Recently Used.
-    let favs: Vec<_> = app.ui.effects_favorites.iter().filter_map(|id| lookup(id)).filter(|e| keep(e)).collect();
+    let favs: Vec<_> = reg.iter().filter(|effect| super::quick_effects::is_favorite(app, effect.id)).filter(|e| keep(e)).collect();
     if !favs.is_empty() && folder_row(app, ui, &lp, list, &mut y, "favorites", "Favorites", 0.0, searching, Some(Icon::Star)) {
         let mut favs = favs;
         favs.sort_by_key(|e| e.name);

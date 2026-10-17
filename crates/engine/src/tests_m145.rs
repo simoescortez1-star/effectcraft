@@ -394,6 +394,12 @@ fn recent_footage_and_presets_are_remembered() {
     s.execute("anim.applyRecentPreset", json!({"index": 0})).unwrap();
     s.execute("anim.clearRecentPresets", json!({})).unwrap();
     assert!(s.prefs.recent_presets.is_empty());
+    // Routing only: there is no fabricated FFX reference file. The separate-converter guard
+    // must run before a JSON preset reader is considered, including uppercase extensions.
+    s.prefs.recent_presets.push("route-only.FFX".into());
+    let error = s.execute("anim.applyRecentPreset", json!({"index":0})).unwrap_err();
+    assert!(error.to_string().contains("FFX requires the separate"), "{error}");
+    s.prefs.recent_presets.clear();
     // Recent lists survive a settings round trip and a reset.
     s.prefs.push_recent_footage("/y/a.wav");
     let back = crate::prefs::Prefs::from_json(&s.prefs.to_json());
